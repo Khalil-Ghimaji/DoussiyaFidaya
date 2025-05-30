@@ -11,6 +11,31 @@ import { Badge } from "@/components/ui/badge"
 import { CalendarIcon, Clock, MapPin } from "lucide-react"
 import Link from "next/link"
 
+interface Doctor {
+  bio: string | null
+  education: string[]
+  experience: string[]
+  first_name: string
+  id: string
+  languages: string[]
+  last_name: string
+  profile_image: string | null
+  specialty: string
+  type: string
+}
+
+interface Appointment {
+  Motif: string
+  Status: string
+  date: string
+  doctor_id: string
+  id: string
+  patient_id: string
+  rdv_id: string | null
+  time: string
+  doctors: Doctor
+}
+
 export function AppointmentsClient({
   confirmedAppointments,
   pendingAppointments,
@@ -18,11 +43,11 @@ export function AppointmentsClient({
   cancelledAppointments,
   upcomingAppointments,
 }: {
-  confirmedAppointments: any[]
-  pendingAppointments: any[]
-  completedAppointments: any[]
-  cancelledAppointments: any[]
-  upcomingAppointments: any[]
+  confirmedAppointments: Appointment[]
+  pendingAppointments: Appointment[]
+  completedAppointments: Appointment[]
+  cancelledAppointments: Appointment[]
+  upcomingAppointments: Appointment[]
 }) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
 
@@ -59,36 +84,36 @@ export function AppointmentsClient({
                       </TableHeader>
                       <TableBody>
                         {confirmedAppointments.map((appointment) => (
-                          <TableRow key={appointment._id}>
+                          <TableRow key={appointment.id}>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <Avatar className="h-8 w-8">
                                   <AvatarImage
-                                    src={appointment.doctor.avatar}
-                                    alt={`${appointment.doctor.firstName} ${appointment.doctor.lastName}`}
+                                    src={appointment.doctors.profile_image || ""}
+                                    alt={`${appointment.doctors.first_name} ${appointment.doctors.last_name}`}
                                   />
-                                  <AvatarFallback>{appointment.doctor.initials}</AvatarFallback>
+                                  <AvatarFallback>
+                                    {`${appointment.doctors.first_name[0]}${appointment.doctors.last_name[0]}`}
+                                  </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <div className="font-medium">{`${appointment.doctor.firstName} ${appointment.doctor.lastName}`}</div>
-                                  <div className="text-xs text-muted-foreground">{appointment.doctor.specialty}</div>
+                                  <div className="font-medium">
+                                    {`${appointment.doctors.first_name} ${appointment.doctors.last_name}`}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">{appointment.doctors.specialty}</div>
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell>
-                              {new Date(appointment.confirmedDate || appointment.preferredDate).toLocaleDateString(
-                                "fr-FR",
-                              )}
-                            </TableCell>
-                            <TableCell>{appointment.confirmedTimeStart || appointment.preferredTimeStart}</TableCell>
-                            <TableCell>{appointment.reason}</TableCell>
+                            <TableCell>{new Date(appointment.date).toLocaleDateString("fr-FR")}</TableCell>
+                            <TableCell>{appointment.time}</TableCell>
+                            <TableCell>{appointment.Motif}</TableCell>
                             <TableCell>
                               <div className="flex space-x-2">
                                 <Button variant="outline" size="sm" asChild>
-                                  <Link href={`/patient/appointments/${appointment._id}`}>Détails</Link>
+                                  <Link href={`/patient/appointments/${appointment.id}`}>Détails</Link>
                                 </Button>
                                 <Button variant="outline" size="sm" asChild>
-                                  <Link href={`/patient/appointments/${appointment._id}/cancel`}>Annuler</Link>
+                                  <Link href={`/patient/appointments/${appointment.id}/cancel`}>Annuler</Link>
                                 </Button>
                               </div>
                             </TableCell>
@@ -125,31 +150,35 @@ export function AppointmentsClient({
                       </TableHeader>
                       <TableBody>
                         {pendingAppointments.map((appointment) => (
-                          <TableRow key={appointment._id}>
+                          <TableRow key={appointment.id}>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <Avatar className="h-8 w-8">
                                   <AvatarImage
-                                    src={appointment.doctor.avatar}
-                                    alt={`${appointment.doctor.firstName} ${appointment.doctor.lastName}`}
+                                    src={appointment.doctors.profile_image || ""}
+                                    alt={`${appointment.doctors.first_name} ${appointment.doctors.last_name}`}
                                   />
-                                  <AvatarFallback>{appointment.doctor.initials}</AvatarFallback>
+                                  <AvatarFallback>
+                                    {`${appointment.doctors.first_name[0]}${appointment.doctors.last_name[0]}`}
+                                  </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <div className="font-medium">{`${appointment.doctor.firstName} ${appointment.doctor.lastName}`}</div>
-                                  <div className="text-xs text-muted-foreground">{appointment.doctor.specialty}</div>
+                                  <div className="font-medium">
+                                    {`${appointment.doctors.first_name} ${appointment.doctors.last_name}`}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">{appointment.doctors.specialty}</div>
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell>{new Date(appointment.preferredDate).toLocaleDateString("fr-FR")}</TableCell>
-                            <TableCell>{appointment.preferredTimeStart}</TableCell>
-                            <TableCell>{appointment.reason}</TableCell>
+                            <TableCell>{new Date(appointment.date).toLocaleDateString("fr-FR")}</TableCell>
+                            <TableCell>{appointment.time}</TableCell>
+                            <TableCell>{appointment.Motif}</TableCell>
                             <TableCell>
                               <Badge variant="secondary">En attente</Badge>
                             </TableCell>
                             <TableCell>
                               <Button variant="outline" size="sm" asChild>
-                                <Link href={`/patient/appointments/${appointment._id}/cancel`}>Annuler</Link>
+                                <Link href={`/patient/appointments/${appointment.id}/cancel`}>Annuler</Link>
                               </Button>
                             </TableCell>
                           </TableRow>
@@ -184,32 +213,32 @@ export function AppointmentsClient({
                       </TableHeader>
                       <TableBody>
                         {completedAppointments.map((appointment) => (
-                          <TableRow key={appointment._id}>
+                          <TableRow key={appointment.id}>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <Avatar className="h-8 w-8">
                                   <AvatarImage
-                                    src={appointment.doctor.avatar}
-                                    alt={`${appointment.doctor.firstName} ${appointment.doctor.lastName}`}
+                                    src={appointment.doctors.profile_image || ""}
+                                    alt={`${appointment.doctors.first_name} ${appointment.doctors.last_name}`}
                                   />
-                                  <AvatarFallback>{appointment.doctor.initials}</AvatarFallback>
+                                  <AvatarFallback>
+                                    {`${appointment.doctors.first_name[0]}${appointment.doctors.last_name[0]}`}
+                                  </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <div className="font-medium">{`${appointment.doctor.firstName} ${appointment.doctor.lastName}`}</div>
-                                  <div className="text-xs text-muted-foreground">{appointment.doctor.specialty}</div>
+                                  <div className="font-medium">
+                                    {`${appointment.doctors.first_name} ${appointment.doctors.last_name}`}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">{appointment.doctors.specialty}</div>
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell>
-                              {new Date(appointment.confirmedDate || appointment.preferredDate).toLocaleDateString(
-                                "fr-FR",
-                              )}
-                            </TableCell>
-                            <TableCell>{appointment.confirmedTimeStart || appointment.preferredTimeStart}</TableCell>
-                            <TableCell>{appointment.reason}</TableCell>
+                            <TableCell>{new Date(appointment.date).toLocaleDateString("fr-FR")}</TableCell>
+                            <TableCell>{appointment.time}</TableCell>
+                            <TableCell>{appointment.Motif}</TableCell>
                             <TableCell>
                               <Button variant="outline" size="sm" asChild>
-                                <Link href={`/patient/medical-record/consultation/${appointment._id}`}>
+                                <Link href={`/patient/medical-record/consultation/${appointment.id}`}>
                                   Voir consultation
                                 </Link>
                               </Button>
@@ -246,26 +275,30 @@ export function AppointmentsClient({
                       </TableHeader>
                       <TableBody>
                         {cancelledAppointments.map((appointment) => (
-                          <TableRow key={appointment._id}>
+                          <TableRow key={appointment.id}>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <Avatar className="h-8 w-8">
                                   <AvatarImage
-                                    src={appointment.doctor.avatar}
-                                    alt={`${appointment.doctor.firstName} ${appointment.doctor.lastName}`}
+                                    src={appointment.doctors.profile_image || ""}
+                                    alt={`${appointment.doctors.first_name} ${appointment.doctors.last_name}`}
                                   />
-                                  <AvatarFallback>{appointment.doctor.initials}</AvatarFallback>
+                                  <AvatarFallback>
+                                    {`${appointment.doctors.first_name[0]}${appointment.doctors.last_name[0]}`}
+                                  </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <div className="font-medium">{`${appointment.doctor.firstName} ${appointment.doctor.lastName}`}</div>
-                                  <div className="text-xs text-muted-foreground">{appointment.doctor.specialty}</div>
+                                  <div className="font-medium">
+                                    {`${appointment.doctors.first_name} ${appointment.doctors.last_name}`}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">{appointment.doctors.specialty}</div>
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell>{new Date(appointment.preferredDate).toLocaleDateString("fr-FR")}</TableCell>
-                            <TableCell>{appointment.preferredTimeStart}</TableCell>
-                            <TableCell>{appointment.reason}</TableCell>
-                            <TableCell>{appointment.cancellationReason || "Non spécifiée"}</TableCell>
+                            <TableCell>{new Date(appointment.date).toLocaleDateString("fr-FR")}</TableCell>
+                            <TableCell>{appointment.time}</TableCell>
+                            <TableCell>{appointment.Motif}</TableCell>
+                            <TableCell>Non spécifiée</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -290,19 +323,21 @@ export function AppointmentsClient({
               <h3 className="font-medium text-sm">Prochains rendez-vous</h3>
               {upcomingAppointments.length > 0 ? (
                 upcomingAppointments.map((appointment) => (
-                  <div key={appointment._id} className="p-2 border rounded-md">
-                    <p className="font-medium">{`${appointment.doctor.firstName} ${appointment.doctor.lastName}`}</p>
+                  <div key={appointment.id} className="p-2 border rounded-md">
+                    <p className="font-medium">
+                      {`${appointment.doctors.first_name} ${appointment.doctors.last_name}`}
+                    </p>
                     <div className="flex items-center text-sm text-muted-foreground">
                       <CalendarIcon className="mr-1 h-3 w-3" />
                       <span className="mr-2">
-                        {new Date(appointment.confirmedDate || appointment.preferredDate).toLocaleDateString("fr-FR")}
+                        {new Date(appointment.date).toLocaleDateString("fr-FR")}
                       </span>
                       <Clock className="mr-1 h-3 w-3" />
-                      <span>{appointment.confirmedTimeStart || appointment.preferredTimeStart}</span>
+                      <span>{appointment.time}</span>
                     </div>
                     <div className="flex items-center text-sm text-muted-foreground mt-1">
                       <MapPin className="mr-1 h-3 w-3" />
-                      <span className="truncate">{appointment.location}</span>
+                      <span className="truncate">{appointment.doctors.specialty}</span>
                     </div>
                   </div>
                 ))
