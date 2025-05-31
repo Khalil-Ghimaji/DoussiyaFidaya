@@ -15,7 +15,7 @@ export async function fetchGraphQL<T>(
       variables,
       fetchPolicy: 'no-cache',
     });
-    
+    console.log(result.data);
     return { data: result.data };
   } catch (error) {
     console.error('GraphQL Error:', error);

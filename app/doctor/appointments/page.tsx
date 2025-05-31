@@ -4,70 +4,253 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UserPlus, Loader2 } from "lucide-react"
 import Link from "next/link"
-import { fetchGraphQL } from "@/lib/server/graphql-client"
-import { GET_DOCTOR_APPOINTMENTS } from "@/lib/server/doctor-queries"
-import { auth } from "@/lib/auth"
+import { fetchGraphQL } from "@/lib/graphql-client"
+// import { auth } from "@/lib/auth"  // Temporarily commented
 import { notFound } from "next/navigation"
 import { DoctorAppointmentsTable } from "@/components/doctor/appointments-table"
 import { AppointmentFilters } from "@/components/doctor/appointment-filters"
+import { gql } from "@apollo/client"
+import { format, parseISO, isSameDay } from "date-fns"
 
 // Using dynamic rendering for appointments page to ensure fresh data
 export const dynamic = "force-dynamic"
 
+// Types for both entities
+interface Patient {
+  id: string
+  profile_image: string | null
+  gender: string
+  cin: string
+  date_of_birth: string
+  user_id: string
+  users: {
+    first_name: string
+    last_name: string
+  }
+}
+
+interface RdvRequest {
+  id: string
+  date: string
+  time: string
+  Motif: string
+  Status: string
+  doctor_id: string
+  patients: Patient
+}
+
+interface Rdv {
+  id: string
+  date: string
+  time: string
+  doctor_id: string
+  patient_id: string
+  rdv_request_id: string | null
+  consultation_id: string | null
+  patients: Patient
+}
+
+// Queries
+const GET_DOCTOR_RDV_REQUESTS = gql`
+  query MyQuery($equals: String) {
+    findManyRdv_requests(where: {doctor_id: {equals: $equals}}) {
+      id
+      date
+      time
+      Motif
+      Status
+      doctor_id
+      patients {
+        id
+        profile_image
+        gender
+        cin
+        date_of_birth
+        user_id
+        users {
+          first_name
+          last_name
+        }
+      }
+    }
+  }
+`
+
+const GET_DOCTOR_RDVS = gql`
+  query MyQuery($equals: String = "") {
+    findManyRdvs(where: {doctor_id: {equals: $equals}}) {
+      consultation_id
+      date
+      doctor_id
+      id
+      patient_id
+      rdv_request_id
+      time
+      patients {
+        cin
+        date_of_birth
+        gender
+        id
+        profile_image
+        user_id
+        users {
+          first_name
+          last_name
+        }
+      }
+    }
+  }
+`
+
+const CREATE_RDV = gql`
+  mutation MyMutation($data: RdvsCreateInput!) {
+    createOneRdvs(data: $data) {
+      consultation_id
+      date
+      doctor_id
+      id
+      patient_id
+      time
+    }
+  }
+`
+
+// Transform functions
+function transformRdvRequest(rdv: RdvRequest) {
+  return {
+    _id: rdv.id,
+    date: rdv.date,
+    time: rdv.time,
+    status: rdv.Status.toLowerCase(),
+    type: "consultation",
+    reason: rdv.Motif,
+    duration: "30",
+    notes: "",
+    createdAt: new Date().toISOString(),
+    createdBy: rdv.doctor_id,
+    consultation_id: null,
+    patient: {
+      _id: rdv.patients.id,
+      firstName: rdv.patients.users.first_name,
+      lastName: rdv.patients.users.last_name,
+      avatar: rdv.patients.profile_image || undefined,
+      initials: "P",
+      age: new Date().getFullYear() - new Date(rdv.patients.date_of_birth).getFullYear(),
+      gender: rdv.patients.gender
+    }
+  }
+}
+
+function transformRdv(rdv: Rdv) {
+  return {
+    _id: rdv.id,
+    date: rdv.date,
+    time: rdv.time,
+    status: "confirmed",
+    type: "consultation",
+    reason: "Consultation",
+    duration: "30",
+    notes: "",
+    createdAt: new Date().toISOString(),
+    createdBy: rdv.doctor_id,
+    consultation_id: rdv.consultation_id,
+    patient: {
+      _id: rdv.patients.id,
+      firstName: rdv.patients.users.first_name,
+      lastName: rdv.patients.users.last_name,
+      avatar: rdv.patients.profile_image || undefined,
+      initials: "P",
+      age: new Date().getFullYear() - new Date(rdv.patients.date_of_birth).getFullYear(),
+      gender: rdv.patients.gender
+    }
+  }
+}
+
 async function DoctorAppointmentsContent({
   searchParams,
 }: { searchParams: { [key: string]: string | string[] | undefined } }) {
-  const session = await auth()
-  if (!session?.user?.id) {
-    notFound()
-  }
+  // Temporarily comment out session check and use a hardcoded doctor ID
+  // const session = await auth()
+  // if (!session?.user?.id) {
+  //   notFound()
+  // }
+
+  // Temporary doctor ID for testing
+  const tempDoctorId = "3665a171-9626-4ee1-a1dd-086a1e445c2d" // Replace with an actual doctor ID from your database
 
   // Parse filters from search params
-  const filters = {
-    status: (searchParams.status as string) || undefined,
-    type: (searchParams.type as string) || undefined,
-    date: (searchParams.date as string) || undefined,
-    search: (searchParams.search as string) || undefined,
-  }
+  const searchFilter = (searchParams.search as string) || ""
+  const dateFilter = searchParams.date ? new Date(searchParams.date as string) : undefined
 
   try {
-    const data = await fetchGraphQL<{
-      doctorAppointments: Array<{
-        _id: string
-        date: string
-        time: string
-        duration: string
-        patient: {
-          _id: string
-          firstName: string
-          lastName: string
-          avatar: string
-          initials: string
-          age: number
-          gender: string
-        }
-        status: string
-        type: string
-        reason: string
-        notes: string
-        createdAt: string
-        createdBy: string
-      }>
-    }>(
-      GET_DOCTOR_APPOINTMENTS,
-      {
-        doctorId: session.user.id,
-        filters,
-      },
-      "no-store",
-    )
+    // Fetch both RDV requests and RDVs
+    const [rdvRequestsResponse, rdvsResponse] = await Promise.all([
+      fetchGraphQL<{ findManyRdv_requests: RdvRequest[] }>(
+        GET_DOCTOR_RDV_REQUESTS,
+        { equals: tempDoctorId }
+      ),
+      fetchGraphQL<{ findManyRdvs: Rdv[] }>(
+        GET_DOCTOR_RDVS,
+        { equals: tempDoctorId }
+      )
+    ])
 
-    const appointments = data.doctorAppointments
+    // Transform and filter RDV requests
+    let rdvRequests = (rdvRequestsResponse.data?.findManyRdv_requests || [])
+      .map(transformRdvRequest)
 
-    // Group appointments by status
-    const upcoming = appointments.filter((app) => app.status === "confirmed")
-    const pending = appointments.filter((app) => app.status === "pending")
-    const past = appointments.filter((app) => app.status === "completed" || app.status === "cancelled")
+    // Transform and filter RDVs
+    let rdvs = (rdvsResponse.data?.findManyRdvs || [])
+      .map(transformRdv)
+
+    // Apply search filter to both
+    if (searchFilter) {
+      const filterBySearch = (app: any) => {
+        const fullName = `${app.patient.firstName} ${app.patient.lastName}`.toLowerCase()
+        const searchLower = searchFilter.toLowerCase()
+        return fullName.includes(searchLower) || (app.reason && app.reason.toLowerCase().includes(searchLower))
+      }
+      rdvRequests = rdvRequests.filter(filterBySearch)
+      rdvs = rdvs.filter(filterBySearch)
+    }
+
+    // Apply date filter to both
+    if (dateFilter) {
+      const filterByDate = (app: any) => {
+        const appDate = parseISO(app.date)
+        return isSameDay(appDate, dateFilter)
+      }
+      rdvRequests = rdvRequests.filter(filterByDate)
+      rdvs = rdvs.filter(filterByDate)
+    }
+
+    // Group appointments
+    const upcoming = rdvs.filter(rdv => !rdv.consultation_id) // RDVs without consultation are upcoming
+    const pending = rdvRequests.filter(req => req.status === "pending")
+    const past = rdvs.filter(rdv => rdv.consultation_id) // RDVs with consultation are past
+    const cancelled = rdvRequests.filter(req => req.status === "cancelled")
+
+    // Function to handle accepting a request
+    const handleAcceptRequest = async (request: RdvRequest) => {
+      try {
+        await fetchGraphQL(
+          CREATE_RDV,
+          {
+            data: {
+              date: request.date,
+              time: request.time,
+              doctor_id: request.doctor_id,
+              patient_id: request.patients.id,
+              rdv_request_id: request.id
+            }
+          }
+        )
+        // Refresh the page after successful creation
+        window.location.reload()
+      } catch (error) {
+        console.error('Error accepting request:', error)
+      }
+    }
 
     return (
       <>
@@ -93,6 +276,7 @@ async function DoctorAppointmentsContent({
             <TabsTrigger value="upcoming">À venir ({upcoming.length})</TabsTrigger>
             <TabsTrigger value="pending">En attente ({pending.length})</TabsTrigger>
             <TabsTrigger value="past">Passés ({past.length})</TabsTrigger>
+            <TabsTrigger value="cancelled">Annulés ({cancelled.length})</TabsTrigger>
           </TabsList>
           <TabsContent value="upcoming" className="space-y-4">
             <Card>
@@ -139,11 +323,28 @@ async function DoctorAppointmentsContent({
               </CardContent>
             </Card>
           </TabsContent>
+          <TabsContent value="cancelled" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Rendez-vous annulés</CardTitle>
+                <CardDescription>
+                  {cancelled.length > 0
+                    ? `Vous avez ${cancelled.length} rendez-vous annulés`
+                    : "Vous n'avez pas de rendez-vous annulés"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DoctorAppointmentsTable appointments={cancelled} isPast />
+              </CardContent>
+              
+            </Card>
+          </TabsContent>
+          
         </Tabs>
       </>
     )
   } catch (error) {
-    console.error("Error fetching doctor appointments:", error)
+    console.error("Error fetching appointments:", error)
     return (
       <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded">
         <p className="font-bold">Erreur</p>

@@ -154,7 +154,7 @@ export default function NewAppointmentPage() {
       const testPatientId = "5b167751-34a2-469a-badf-f57cda19cf55"
 
       const formattedDate = format(date, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx")
-      const formattedTime = `1970-01-01T${time}:00.000Z`
+      const formattedTime = `1970-01-01T${time}:00.000+00:00`
 
       const response = await fetchGraphQL<CreateRdvResponse>(CREATE_RDV, {
         Motif: reason,

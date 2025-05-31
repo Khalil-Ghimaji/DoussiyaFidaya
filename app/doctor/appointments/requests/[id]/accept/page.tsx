@@ -3,64 +3,86 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
-import { fetchGraphQL } from "@/lib/server/graphql-client"
-import { GET_APPOINTMENT_DETAILS } from "@/lib/server/doctor-queries"
+import { fetchGraphQL } from "@/lib/graphql-client"
 import { redirect } from "next/navigation"
 import { AcceptAppointmentForm } from "./accept-form"
+
+const GET_RDV_REQUEST = `
+  query GetRdvRequest($id: String!) {
+    findUniqueRdv_requests(where: {id: $id}) {
+      Motif
+      Status
+      date
+      doctor_id
+      id
+      patient_id
+      patients {
+        gender
+        date_of_birth
+        cin
+        id
+        profile_image
+        user_id
+        users {
+          first_name
+          last_name
+        }
+      }
+      time
+    }
+  }
+`
 
 // Using dynamic rendering for accept appointment page to ensure fresh data
 export const dynamic = "force-dynamic"
 
 async function AcceptAppointmentContent({ appointmentId }: { appointmentId: string }) {
   try {
-    const data = await fetchGraphQL<{
-      appointment: {
-        _id: string
+    const { data } = await fetchGraphQL<{
+      findUniqueRdv_requests: {
+        Motif: string
+        Status: string
         date: string
-        time: string
-        duration: string
-        patient: {
-          _id: string
-          firstName: string
-          lastName: string
-          avatar: string
-          initials: string
-          age: number
+        doctor_id: string
+        id: string
+        patient_id: string
+        patients: {
           gender: string
-          bloodType: string
-          allergies: string[]
-          medicalHistory: Array<{
-            condition: string
-            since: string
-          }>
-          currentTreatments: Array<{
-            name: string
-            dosage: string
-            frequency: string
-            prescribedBy: string
-          }>
+          date_of_birth: string
+          cin: string
+          id: string
+          profile_image: string
+          user_id: string
+          users: {
+            first_name: string
+            last_name: string
+          }
         }
-        doctor: {
-          _id: string
-          firstName: string
-          lastName: string
-          specialty: string
-          hospital: string
-        }
-        status: string
-        type: string
-        reason: string
-        notes: string
-        createdAt: string
-        createdBy: string
+        time: string
       }
-    }>(GET_APPOINTMENT_DETAILS, { appointmentId }, "no-store")
+    }>(GET_RDV_REQUEST, { id: appointmentId })
 
-    const appointment = data.appointment
+    const request = data.findUniqueRdv_requests
 
     // If the appointment is not pending, redirect to the appointments page
-    if (appointment.status !== "pending") {
+    if (request.Status !== "pending") {
       redirect("/doctor/appointments")
+    }
+
+    const appointment = {
+      id: request.id,
+      date: request.date,
+      time: request.time,
+      duration: "30",
+      patient: {
+        id: request.patients.id,
+        firstName: request.patients.users.first_name,
+        lastName: request.patients.users.last_name
+      },
+      doctor: {
+        id: request.doctor_id
+      },
+      reason: request.Motif
     }
 
     return (
@@ -78,8 +100,8 @@ async function AcceptAppointmentContent({ appointmentId }: { appointmentId: stri
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Accepter la demande de rendez-vous</h1>
             <p className="text-muted-foreground">
-              Demande de {appointment.patient.firstName} {appointment.patient.lastName} pour le{" "}
-              {new Date(appointment.date).toLocaleDateString("fr-FR")}
+              Demande de {request.patients.users.first_name} {request.patients.users.last_name} pour le{" "}
+              {new Date(request.date).toLocaleDateString("fr-FR")}
             </p>
           </div>
         </div>
@@ -96,50 +118,26 @@ async function AcceptAppointmentContent({ appointmentId }: { appointmentId: stri
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Patient</p>
                     <p className="font-medium">
-                      {appointment.patient.firstName} {appointment.patient.lastName}
+                      {request.patients.users.first_name} {request.patients.users.last_name}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Âge / Genre</p>
-                    <p>
-                      {appointment.patient.age} ans / {appointment.patient.gender === "male" ? "Homme" : "Femme"}
-                    </p>
+                    <p className="text-sm font-medium text-muted-foreground">Genre</p>
+                    <p>{request.patients.gender === "male" ? "Homme" : "Femme"}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Date demandée</p>
-                    <p>{new Date(appointment.date).toLocaleDateString("fr-FR")}</p>
+                    <p>{new Date(request.date).toLocaleDateString("fr-FR")}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Heure demandée</p>
-                    <p>{appointment.time}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Type de rendez-vous</p>
-                    <p>
-                      {appointment.type === "consultation"
-                        ? "Consultation"
-                        : appointment.type === "followup"
-                          ? "Suivi"
-                          : appointment.type === "emergency"
-                            ? "Urgence"
-                            : "Procédure médicale"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Durée</p>
-                    <p>{appointment.duration} minutes</p>
+                    <p>{request.time}</p>
                   </div>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Motif</p>
-                  <p>{appointment.reason}</p>
+                  <p>{request.Motif}</p>
                 </div>
-                {appointment.notes && (
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Notes</p>
-                    <p>{appointment.notes}</p>
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>
@@ -151,22 +149,12 @@ async function AcceptAppointmentContent({ appointmentId }: { appointmentId: stri
             <CardContent>
               <div className="space-y-4">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Groupe sanguin</p>
-                  <p>{appointment.patient.bloodType}</p>
+                  <p className="text-sm font-medium text-muted-foreground">CIN</p>
+                  <p>{request.patients.cin}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Allergies</p>
-                  <p>{appointment.patient.allergies.join(", ") || "Aucune"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Antécédents médicaux</p>
-                  <ul className="list-disc pl-5 space-y-1">
-                    {appointment.patient.medicalHistory.map((item, index) => (
-                      <li key={index}>
-                        {item.condition} (depuis {item.since})
-                      </li>
-                    ))}
-                  </ul>
+                  <p className="text-sm font-medium text-muted-foreground">Date de naissance</p>
+                  <p>{new Date(request.patients.date_of_birth).toLocaleDateString("fr-FR")}</p>
                 </div>
               </div>
             </CardContent>

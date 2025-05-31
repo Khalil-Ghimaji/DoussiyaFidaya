@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CalendarIcon, SearchIcon, X } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -17,8 +16,6 @@ export function AppointmentFilters() {
   const searchParams = useSearchParams()
 
   const [search, setSearch] = useState(searchParams.get("search") || "")
-  const [status, setStatus] = useState(searchParams.get("status") || "")
-  const [type, setType] = useState(searchParams.get("type") || "")
   const [date, setDate] = useState<Date | undefined>(
     searchParams.get("date") ? new Date(searchParams.get("date") as string) : undefined,
   )
@@ -33,18 +30,6 @@ export function AppointmentFilters() {
       params.delete("search")
     }
 
-    if (status) {
-      params.set("status", status)
-    } else {
-      params.delete("status")
-    }
-
-    if (type) {
-      params.set("type", type)
-    } else {
-      params.delete("type")
-    }
-
     if (date) {
       params.set("date", format(date, "yyyy-MM-dd"))
     } else {
@@ -52,23 +37,21 @@ export function AppointmentFilters() {
     }
 
     router.push(`?${params.toString()}`)
-  }, [search, status, type, date, router, searchParams])
+  }, [search, date, router, searchParams])
 
   // Reset all filters
   const resetFilters = () => {
     setSearch("")
-    setStatus("")
-    setType("")
     setDate(undefined)
     router.push("/doctor/appointments")
   }
 
   // Check if any filters are applied
-  const hasFilters = search || status || type || date
+  const hasFilters = search || date
 
   return (
     <div className="bg-muted/40 p-4 rounded-lg">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="search" className="mb-2 block">
             Recherche
@@ -83,41 +66,6 @@ export function AppointmentFilters() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-        </div>
-
-        <div>
-          <Label htmlFor="status" className="mb-2 block">
-            Statut
-          </Label>
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger id="status">
-              <SelectValue placeholder="Tous les statuts" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les statuts</SelectItem>
-              <SelectItem value="confirmed">Confirmé</SelectItem>
-              <SelectItem value="pending">En attente</SelectItem>
-              <SelectItem value="completed">Terminé</SelectItem>
-              <SelectItem value="cancelled">Annulé</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label htmlFor="type" className="mb-2 block">
-            Type
-          </Label>
-          <Select value={type} onValueChange={setType}>
-            <SelectTrigger id="type">
-              <SelectValue placeholder="Tous les types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les types</SelectItem>
-              <SelectItem value="consultation">Consultation</SelectItem>
-              <SelectItem value="follow-up">Suivi</SelectItem>
-              <SelectItem value="emergency">Urgence</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         <div>
