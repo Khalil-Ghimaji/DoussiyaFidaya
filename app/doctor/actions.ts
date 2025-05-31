@@ -3,6 +3,7 @@
 import { revalidateTag } from "next/cache"
 import { executeGraphQLServer } from "@/lib/graphql-server"
 import { auth } from "@/lib/auth"
+import { sendGraphQLMutation } from "@/lib/graphql-client"
 
 // Appointment actions
 export async function declineAppointmentRequest(
@@ -410,7 +411,7 @@ export async function createMedicalCertificate(certificateData: any) {
       }
     `
 
-    const result = await executeGraphQLServer(
+    const result = await executeGraphQLServer<{ createMedicalCertificate: { _id: string; success: boolean; message?: string } }>(
       mutation,
       {
         input: {
@@ -480,3 +481,130 @@ export async function searchPatients(searchTerm: string) {
   }
 }
 
+export async function createAppointment(data: any) {
+  try {
+    interface CreateAppointmentResponse {
+      createOneRdvs: {
+        id: string;
+      };
+    }
+
+    const result = await sendGraphQLMutation<CreateAppointmentResponse>(
+      `mutation CreateAppointment($data: RdvsCreateInput!) {
+        createOneRdvs(data: $data) {
+          id
+        }
+      }`,
+      { data }
+    )
+
+    return { success: true, appointmentId: result.data.createOneRdvs.id }
+  } catch (error) {
+    console.error("Error creating appointment:", error)
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "An error occurred",
+    }
+  }
+}
+
+const UPDATE_CONSULTATION = `
+  mutation updateOneConsultations($data: ConsultationsUpdateInput!, $where: ConsultationsWhereUniqueInput!) {
+    updateOneConsultations(data: $data, where: $where) {
+      id
+    }
+  }
+`
+
+export async function updateConsultation(id: string, values: {
+  reason: string
+  notes: string
+  diagnosis: string
+  vitalSigns: {
+    bloodPressure: string
+    heartRate: string
+    temperature: string
+    respiratoryRate: string
+    oxygenSaturation: string
+    weight: string
+  }
+  prescriptions?: {
+    _id?: string
+    name: string
+    dosage: string
+    frequency: string
+    duration: string
+    quantity: string
+  }[]
+  labRequests?: {
+    _id?: string
+    type: string
+    priority: string
+    description: string
+  }[]
+}) {
+  try {
+    // Transform frontend values to backend format
+    const data = {
+      notes: {
+        set: [values.reason, ...values.notes.split('\n').filter(note => note.trim())]
+      },
+      measures: {
+        set: {
+          diagnosis: values.diagnosis,
+          vital_signs: {
+            blood_pressure: values.vitalSigns.bloodPressure,
+            heart_rate: values.vitalSigns.heartRate,
+            temperature: values.vitalSigns.temperature,
+            respiratory_rate: values.vitalSigns.respiratoryRate,
+            oxygen_saturation: values.vitalSigns.oxygenSaturation,
+            weight: values.vitalSigns.weight
+          }
+        }
+      },
+      prescriptions: values.prescriptions ? {
+        update: {
+          medications: {
+            deleteMany: {},
+            createMany: {
+              data: values.prescriptions.map(prescription => ({
+                name: prescription.name,
+                dosage: prescription.dosage,
+                frequency: prescription.frequency,
+                duration: prescription.duration,
+                quantity: prescription.quantity
+              }))
+            }
+          }
+        }
+      } : undefined,
+      consultation_lab_requests: values.labRequests ? {
+        deleteMany: {},
+        createMany: {
+          data: values.labRequests.map(request => ({
+            lab_requests: {
+              create: {
+                type: request.type,
+                priority: request.priority,
+                description: request.description
+              }
+            }
+          }))
+        }
+      } : undefined
+    }
+    console.log("update consultation data", data)
+    const result = await sendGraphQLMutation<{ updateOneConsultations: { id: string } }>(
+      UPDATE_CONSULTATION,
+      {
+        where: { id },
+        data
+      }
+    )
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error updating consultation:", error)
+    return { success: false, message: error instanceof Error ? error.message : "Une erreur est survenue" }
+  }
+}
