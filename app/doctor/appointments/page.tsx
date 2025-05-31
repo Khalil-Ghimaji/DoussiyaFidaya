@@ -50,6 +50,16 @@ interface Rdv {
   patients: Patient
 }
 
+interface PatientResponse {
+  findManyPatients: Array<{
+    id: string
+    users: {
+      first_name: string
+      last_name: string
+    }
+  }>
+}
+
 // Queries
 const GET_DOCTOR_RDV_REQUESTS = gql`
   query MyQuery($equals: String) {
@@ -115,6 +125,19 @@ const CREATE_RDV = gql`
   }
 `
 
+// Query to get all patients
+const GET_PATIENTS = `
+  query GetPatients {
+    findManyPatients {
+      id
+      users {
+        first_name
+        last_name
+      }
+    }
+  }
+`
+
 // Transform functions
 function transformRdvRequest(rdv: RdvRequest) {
   return {
@@ -164,6 +187,15 @@ function transformRdv(rdv: Rdv) {
       gender: rdv.patients.gender
     }
   }
+}
+
+async function getPatients() {
+  const { data } = await fetchGraphQL<PatientResponse>(GET_PATIENTS)
+  return data.findManyPatients.map((patient) => ({
+    id: patient.id,
+    firstName: patient.users.first_name,
+    lastName: patient.users.last_name,
+  }))
 }
 
 async function DoctorAppointmentsContent({
@@ -252,6 +284,9 @@ async function DoctorAppointmentsContent({
       }
     }
 
+    const patients = await getPatients()
+    const doctorId = "your-doctor-id" // Replace with actual doctor ID from your auth context
+
     return (
       <>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -336,10 +371,8 @@ async function DoctorAppointmentsContent({
               <CardContent>
                 <DoctorAppointmentsTable appointments={cancelled} isPast />
               </CardContent>
-              
             </Card>
           </TabsContent>
-          
         </Tabs>
       </>
     )
