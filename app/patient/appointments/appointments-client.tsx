@@ -10,6 +10,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { CalendarIcon, Clock, MapPin } from "lucide-react"
 import Link from "next/link"
+import { fetchGraphQL } from "@/lib/graphql-client"
+import { useToast } from "@/hooks/use-toast"
+import { gql } from '@apollo/client'
+
+const CANCEL_APPOINTMENT = gql`
+  mutation CancelAppointment($Status: StringFieldUpdateOperationsInput = {set: "cancelled"}, $id: String = "") {
+    updateOneRdv_requests(data: {Status: $Status}, where: {id: $id}) {
+      Status
+    }
+  }
+`
 
 interface Doctor {
   bio: string | null
@@ -36,6 +47,12 @@ interface Appointment {
   doctors: Doctor
 }
 
+interface CancelAppointmentResponse {
+  updateOneRdv_requests: {
+    Status: string
+  }
+}
+
 export function AppointmentsClient({
   confirmedAppointments,
   pendingAppointments,
@@ -50,6 +67,40 @@ export function AppointmentsClient({
   upcomingAppointments: Appointment[]
 }) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
+  const [isLoading, setIsLoading] = useState<string | null>(null)
+  const { toast } = useToast()
+
+  const handleCancelAppointment = async (appointmentId: string) => {
+    try {
+      setIsLoading(appointmentId)
+      
+      const response = await fetchGraphQL<CancelAppointmentResponse>(CANCEL_APPOINTMENT, {
+        id: appointmentId,
+        Status: { set: "cancelled" }
+      })
+
+      if (!response?.data?.updateOneRdv_requests) {
+        throw new Error("Failed to cancel appointment")
+      }
+
+      toast({
+        title: "Rendez-vous annulé",
+        description: "Le rendez-vous a été annulé avec succès",
+      })
+
+      // Refresh the page to update the appointments list
+      window.location.reload()
+    } catch (error) {
+      console.error("Error cancelling appointment:", error)
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de l'annulation du rendez-vous",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(null)
+    }
+  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -112,8 +163,20 @@ export function AppointmentsClient({
                                 <Button variant="outline" size="sm" asChild>
                                   <Link href={`/patient/appointments/${appointment.id}`}>Détails</Link>
                                 </Button>
-                                <Button variant="outline" size="sm" asChild>
-                                  <Link href={`/patient/appointments/${appointment.id}/cancel`}>Annuler</Link>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleCancelAppointment(appointment.id)}
+                                  disabled={isLoading === appointment.id}
+                                >
+                                  {isLoading === appointment.id ? (
+                                    <>
+                                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                                      Annulation...
+                                    </>
+                                  ) : (
+                                    "Annuler"
+                                  )}
                                 </Button>
                               </div>
                             </TableCell>
@@ -177,9 +240,26 @@ export function AppointmentsClient({
                               <Badge variant="secondary">En attente</Badge>
                             </TableCell>
                             <TableCell>
-                              <Button variant="outline" size="sm" asChild>
-                                <Link href={`/patient/appointments/${appointment.id}/cancel`}>Annuler</Link>
-                              </Button>
+                              <div className="flex space-x-2">
+                                <Button variant="outline" size="sm" asChild>
+                                  <Link href={`/patient/appointments/${appointment.id}`}>Détails</Link>
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleCancelAppointment(appointment.id)}
+                                  disabled={isLoading === appointment.id}
+                                >
+                                  {isLoading === appointment.id ? (
+                                    <>
+                                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                                      Annulation...
+                                    </>
+                                  ) : (
+                                    "Annuler"
+                                  )}
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -270,7 +350,7 @@ export function AppointmentsClient({
                           <TableHead>Date</TableHead>
                           <TableHead>Heure</TableHead>
                           <TableHead>Motif</TableHead>
-                          <TableHead>Raison d'annulation</TableHead>
+                          
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -298,7 +378,7 @@ export function AppointmentsClient({
                             <TableCell>{new Date(appointment.date).toLocaleDateString("fr-FR")}</TableCell>
                             <TableCell>{appointment.time}</TableCell>
                             <TableCell>{appointment.Motif}</TableCell>
-                            <TableCell>Non spécifiée</TableCell>
+                            
                           </TableRow>
                         ))}
                       </TableBody>
