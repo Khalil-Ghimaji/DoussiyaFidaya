@@ -21,7 +21,7 @@ export async function fetchGraphQL<T>(
     throw error;
   }
 }
-export async function pushGraphQL<T>(
+export async function sendGraphQLMutation<T>(
   mutation: string | DocumentNode,
   variables?: Record<string, any>
 ): Promise<{ data: T }> {
