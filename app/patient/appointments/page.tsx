@@ -2,7 +2,6 @@ import { Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { Plus, Loader2 } from "lucide-react"
 import Link from "next/link"
-//mport { GET_PATIENT_APPOINTMENTS } from "@/lib/graphql/queries"
 import { AppointmentsClient } from "./appointments-client"
 import {fetchGraphQL} from "@/lib/graphql-client";
 import {auth} from "@/lib/auth";
@@ -102,7 +101,7 @@ export default async function PatientAppointmentsPage() {
 }
 
 async function AppointmentsContent() {
-  const testId = "5b167751-34a2-469a-badf-f57cda19cf55"
+  const testId = "0c04a7d3-cfe7-4b2c-8a0f-7fe245b82230"
   const { data } = await fetchGraphQL<{  findManyRdv_requests: Appointment[] }>(GET_PATIENT_APPOINTMENTS, {
     patient_id: {
       equals: testId

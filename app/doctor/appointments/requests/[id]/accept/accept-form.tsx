@@ -166,6 +166,33 @@ export function AcceptAppointmentForm({ appointment }: AcceptAppointmentFormProp
     }
   }
 
+  const handleCancel = async () => {
+    setIsSubmitting(true)
+    setError(null)
+    try {
+      const { errors: updateErrors } = await fetchGraphQL(
+        UPDATE_RDV_REQUEST,
+        {
+          set: "cancelled",
+          where: {
+            id: appointment.id
+          }
+        } as RdvRequestUpdateInput
+      ) as GraphQLResponse<unknown>
+
+      if (updateErrors) {
+        console.error("Update Status Errors:", updateErrors)
+        throw new Error(updateErrors.map((e: GraphQLError) => e.message).join(", "))
+      }
+
+      router.push("/doctor/appointments?status=cancelled")
+    } catch (error) {
+      console.error("Full error object:", error)
+      setError(error instanceof Error ? error.message : "Une erreur est survenue")
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -214,8 +241,12 @@ export function AcceptAppointmentForm({ appointment }: AcceptAppointmentFormProp
         </div>
 
         <div className="flex justify-end gap-4 pt-4">
+          <Button variant="destructive" onClick={handleCancel} disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Refuser
+          </Button>
           <Button variant="outline" onClick={() => router.back()}>
-            Annuler
+            Retour
           </Button>
           <Button onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

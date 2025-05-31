@@ -123,7 +123,7 @@ async function AcceptAppointmentContent({ appointmentId }: { appointmentId: stri
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Genre</p>
-                    <p>{request.patients.gender === "male" ? "Homme" : "Femme"}</p>
+                    <p>{request.patients.gender === "Male" ? "Homme" : "Femme"}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Date demandée</p>
