@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useFormState } from "react-dom"
-import { registerUser } from "@/actions/auth-actions"
+import { useRouter } from "next/navigation"
+import { registerPatient, registerDoctor } from "@/actions/auth-actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,16 +11,88 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-// This page uses Client-Side Rendering with Server Actions for form submission
+// Enums for registration
+enum Role {
+  Doctor = "Doctor",
+  Patient = "Patient"
+}
+
+enum doctors_type_enum {
+  doctor = "doctor",
+  clinique = "clinique",
+  hopital = "hopital"
+}
+
+enum doctors_specialty_enum {
+  generaliste = "generaliste",
+  cardiologue = "cardiologue",
+  dermatologue = "dermatologue",
+  gynecologue = "gynecologue",
+  pediatre = "pediatre",
+  orthopediste = "orthopediste",
+  psychiatre = "psychiatre",
+  ophtalmologue = "ophtalmologue",
+  otorhinolaryngologue = "otorhinolaryngologue",
+  neurologue = "neurologue",
+  urologue = "urologue",
+  endocrinologue = "endocrinologue",
+  gastroenterologue = "gastroenterologue",
+  rheumatologue = "rheumatologue",
+  anesthesiste = "anesthesiste",
+  radiologue = "radiologue",
+  oncologue = "oncologue",
+  chirurgien = "chirurgien",
+  nutritionniste = "nutritionniste",
+  physiotherapeute = "physiotherapeute",
+  psychologue = "psychologue",
+  sexologue = "sexologue",
+  geriatre = "geriatre",
+  allergologue = "allergologue",
+  hematologue = "hematologue",
+  nephrologue = "nephrologue",
+  pneumologue = "pneumologue",
+  dentiste = "dentiste",
+  orthodontiste = "orthodontiste",
+  autre = "autre"
+}
+
+enum patients_gender_enum {
+  Male = "Male",
+  Female = "Female"
+}
+
+type ActionState = {
+  success: boolean
+  message: string
+  email?: string | null
+}
+
 export default function RegisterClientPage() {
-  const [state, formAction] = useFormState(registerUser, { success: false, message: "" })
+  const router = useRouter()
+  const [selectedRole, setSelectedRole] = useState<Role>(Role.Patient)
+  const [error, setError] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async (formData: FormData) => {
-    setIsSubmitting(true)
-    await formAction(formData)
-    setIsSubmitting(false)
+    try {
+      setIsSubmitting(true)
+      setError("")
+      
+      formData.set("role", selectedRole)
+      const result = await (selectedRole === Role.Patient ? registerPatient : registerDoctor)(null, formData)
+      
+      if (result.success && result.email) {
+        router.push(`/auth/verify-code?email=${encodeURIComponent(result.email)}`)
+      } else {
+        setError(result.message)
+      }
+    } catch (err) {
+      setError("An error occurred during registration")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -33,12 +105,35 @@ export default function RegisterClientPage() {
 
         <form action={handleSubmit}>
           <CardContent className="space-y-4">
-            {state.message && (
+            {error && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{state.message}</AlertDescription>
+                <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
+
+            <div className="space-y-2">
+              <Label>Type de compte</Label>
+              <RadioGroup 
+                defaultValue={Role.Patient}
+                className="flex flex-col space-y-1"
+                value={selectedRole}
+                onValueChange={(value: string) => setSelectedRole(value as Role)}
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value={Role.Patient} id="patient" />
+                  <Label htmlFor="patient" className="font-normal">
+                    Patient
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value={Role.Doctor} id="doctor" />
+                  <Label htmlFor="doctor" className="font-normal">
+                    Médecin
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -66,40 +161,77 @@ export default function RegisterClientPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Type de compte</Label>
-              <RadioGroup defaultValue="PATIENT" name="role" className="flex flex-col space-y-1">
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="PATIENT" id="patient" />
-                  <Label htmlFor="patient" className="font-normal">
-                    Patient
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="DOCTOR" id="doctor" />
-                  <Label htmlFor="doctor" className="font-normal">
-                    Médecin
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="LABORATORY" id="laboratory" />
-                  <Label htmlFor="laboratory" className="font-normal">
-                    Laboratoire
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="PHARMACY" id="pharmacy" />
-                  <Label htmlFor="pharmacy" className="font-normal">
-                    Pharmacie
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="ASSISTANT" id="assistant" />
-                  <Label htmlFor="assistant" className="font-normal">
-                    Assistant(e)
-                  </Label>
-                </div>
-              </RadioGroup>
+              <Label htmlFor="phone">Téléphone</Label>
+              <Input id="phone" name="phone" type="tel" />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="address">Adresse</Label>
+              <Input id="address" name="address" />
+            </div>
+
+            {/* Patient-specific fields */}
+            {selectedRole === Role.Patient && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="cin">CIN</Label>
+                  <Input id="cin" name="cin" type="number" min="10000000" max="99999999" required />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="date_of_birth">Date de naissance</Label>
+                  <Input id="date_of_birth" name="date_of_birth" type="date" required />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="gender">Genre</Label>
+                  <Select name="gender" required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionnez votre genre" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={patients_gender_enum.Male}>Homme</SelectItem>
+                      <SelectItem value={patients_gender_enum.Female}>Femme</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {/* Doctor-specific fields */}
+            {selectedRole === Role.Doctor && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="type">Type d'établissement</Label>
+                  <Select name="type" required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionnez votre type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={doctors_type_enum.doctor}>Cabinet médical</SelectItem>
+                      <SelectItem value={doctors_type_enum.clinique}>Clinique</SelectItem>
+                      <SelectItem value={doctors_type_enum.hopital}>Hôpital</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="specialty">Spécialité</Label>
+                  <Select name="specialty" required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionnez votre spécialité" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(doctors_specialty_enum).map(([key, value]) => (
+                        <SelectItem key={key} value={value}>
+                          {key.charAt(0).toUpperCase() + key.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
           </CardContent>
 
           <CardFooter className="flex flex-col space-y-4">
