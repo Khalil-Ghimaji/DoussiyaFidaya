@@ -14,6 +14,7 @@ type FormData = {
 export async function createLabRequestAction(patientId: string, formData: FormData) {
   try {
     // Map tests to description format if needed
+    //TODO: Replace with actual session management
     const session = {
     user: {
       id: "fc6d9c2c-6ec6-48c1-b762-fe35c2894b30", // Simulated logged-in doctor

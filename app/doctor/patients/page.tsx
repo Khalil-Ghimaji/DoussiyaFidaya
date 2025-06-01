@@ -75,6 +75,8 @@ async function getDoctorPatients() {
       throw new Error("User not authenticated")
     }
   */
+
+  //TODO: Replace with actual session management for docID
   try {
     const docID = "fc6d9c2c-6ec6-48c1-b762-fe35c2894b30"
     const { data } = await fetchGraphQL<GraphQLResponse>(
