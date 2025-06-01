@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, CheckCircle } from "lucide-react"
+import { AlertCircle, CheckCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,13 +16,14 @@ export default function VerifyCodePage() {
   const [code, setCode] = useState("")
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
   const [message, setMessage] = useState("")
+  const [isResending, setIsResending] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setStatus("loading")
 
     try {
-      const response = await fetch("/api/auth/verify-code", {
+      const response = await fetch("/api/email-verification/verify", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -44,14 +45,18 @@ export default function VerifyCodePage() {
         setMessage(data.message || "Code de vérification incorrect")
       }
     } catch (error) {
+      console.error("Verification error:", error)
       setStatus("error")
       setMessage("Une erreur s'est produite lors de la vérification")
     }
   }
 
   const handleResendCode = async () => {
+    if (isResending) return
+    setIsResending(true)
+
     try {
-      const response = await fetch("/api/auth/resend-code", {
+      const response = await fetch("/api/email-verification/resend", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -67,7 +72,10 @@ export default function VerifyCodePage() {
         setMessage(data.message || "Erreur lors de l'envoi du code")
       }
     } catch (error) {
+      console.error("Resend code error:", error)
       setMessage("Erreur lors de l'envoi du code")
+    } finally {
+      setIsResending(false)
     }
   }
 
@@ -106,12 +114,18 @@ export default function VerifyCodePage() {
               <Input
                 id="code"
                 type="text"
+                inputMode="numeric"
+                pattern="\d*"
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, "").slice(0, 6)
+                  setCode(value)
+                }}
                 placeholder="Entrez le code à 6 chiffres"
                 required
                 maxLength={6}
                 className="text-center text-2xl tracking-widest"
+                disabled={status === "loading"}
               />
             </div>
 
@@ -120,17 +134,33 @@ export default function VerifyCodePage() {
               className="w-full"
               disabled={status === "loading" || code.length !== 6}
             >
-              {status === "loading" ? "Vérification..." : "Vérifier"}
+              {status === "loading" ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Vérification...
+                </>
+              ) : (
+                "Vérifier"
+              )}
             </Button>
 
             <div className="text-center text-sm">
-              <button
+              <Button
                 type="button"
+                variant="link"
                 onClick={handleResendCode}
+                disabled={isResending}
                 className="text-primary hover:underline"
               >
-                Renvoyer le code
-              </button>
+                {isResending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Envoi en cours...
+                  </>
+                ) : (
+                  "Renvoyer le code"
+                )}
+              </Button>
             </div>
           </form>
         </CardContent>

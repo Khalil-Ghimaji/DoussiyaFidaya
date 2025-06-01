@@ -2,28 +2,38 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { loginUser } from "@/actions/auth-actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle } from "lucide-react"
+import { AlertCircle, Loader2 } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function LoginPage() {
   const router = useRouter()
-  const [error, setError] = useState<string>("")
+  const searchParams = useSearchParams()
+  const message = searchParams.get("message")
+  const defaultRole = searchParams.get("role")
+  
+  const [error, setError] = useState<string>(message || "")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [selectedRole, setSelectedRole] = useState<string>(defaultRole || "")
 
   const handleSubmit = async (formData: FormData) => {
     try {
       setIsSubmitting(true)
       setError("")
       
+      formData.set("role", selectedRole)
+      
       const result = await loginUser(null, formData)
       
-      if (!result?.success) {
+      if (result?.success && result?.redirect) {
+        router.push(result.redirect)
+      } else {
         setError(result?.message || "An error occurred during login")
       }
     } catch (err) {
@@ -51,6 +61,27 @@ export default function LoginPage() {
             )}
 
             <div className="space-y-2">
+              <Label htmlFor="role">Type de compte</Label>
+              <Select
+                name="role"
+                value={selectedRole}
+                onValueChange={setSelectedRole}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionnez votre type de compte" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="patient">Patient</SelectItem>
+                  <SelectItem value="doctor">Médecin</SelectItem>
+                  <SelectItem value="laboratory">Laboratoire</SelectItem>
+                  <SelectItem value="pharmacy">Pharmacie</SelectItem>
+                  <SelectItem value="assistant">Assistant</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="email">Adresse e-mail</Label>
               <Input 
                 id="email" 
@@ -58,6 +89,7 @@ export default function LoginPage() {
                 type="email" 
                 placeholder="nom@exemple.com" 
                 required 
+                disabled={isSubmitting}
               />
             </div>
 
@@ -68,13 +100,21 @@ export default function LoginPage() {
                 name="password" 
                 type="password" 
                 required 
+                disabled={isSubmitting}
               />
             </div>
           </CardContent>
 
           <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Connexion en cours..." : "Se connecter"}
+            <Button type="submit" className="w-full" disabled={isSubmitting || !selectedRole}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Connexion en cours...
+                </>
+              ) : (
+                "Se connecter"
+              )}
             </Button>
 
             <div className="flex flex-col space-y-2 text-center text-sm">
