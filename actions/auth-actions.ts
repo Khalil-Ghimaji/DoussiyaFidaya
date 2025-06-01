@@ -1,6 +1,7 @@
 "use server"
 
 import { redirect } from "next/navigation"
+import { cookies } from "next/headers"
 
 enum Role {
   Doctor = "Doctor",
@@ -10,14 +11,69 @@ enum Role {
 type ActionState = {
   success: boolean
   message: string
-  email?: string
+  email?: string | null
+  redirect?: string
+}
+
+// Base interface for associated data
+interface BaseAssociatedData {
+  id: string // Only required field
+  type?: string
+  user_id?: string
+  first_name?: string
+  last_name?: string
+  profile_image?: string | null
+}
+
+// Doctor specific associated data
+interface DoctorAssociatedData extends BaseAssociatedData {
+  is_license_verified?: boolean
+  bio?: string | null
+  education?: any[]
+  experience?: any[]
+  languages?: string[]
+  specialty?: string
+}
+
+// Patient specific associated data
+interface PatientAssociatedData extends BaseAssociatedData {
+  blood_type?: string
+  allergies?: string[]
+  medical_history?: any[]
+  emergency_contact?: {
+    name?: string
+    phone?: string
+    relationship?: string
+  }
+}
+
+interface User {
+  id: string
+  address?: string
+  created_at?: string
+  email: string
+  first_name?: string
+  last_name?: string
+  is_verified?: boolean
+  last_login?: string | null
+  phone?: string
+  profile_picture?: string | null
+  role: string
+  associated_id?: string
+  updated_at?: string
+  associated_data?: DoctorAssociatedData | PatientAssociatedData
+}
+
+interface LoginResponse {
+  message: string
+  user: User
+  token: string
 }
 
 export async function loginUser(prevState: ActionState | null, formData: FormData) {
   const email = formData.get("email") as string
   const password = formData.get("password") as string
   const role = formData.get("role") as string
-  const rememberMe = formData.get("rememberMe") === "on"
 
   try {
     const response = await fetch(`${process.env.API_URL}/auth/login`, {
@@ -25,7 +81,7 @@ export async function loginUser(prevState: ActionState | null, formData: FormDat
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ email, password, role, rememberMe }),
+      body: JSON.stringify({ email, password, role }),
     })
 
     const data = await response.json()
@@ -37,20 +93,54 @@ export async function loginUser(prevState: ActionState | null, formData: FormDat
       }
     }
 
-    // Redirect to dashboard based on user role
-    switch (data.user.role) {
+    // Store the token in an HTTP-only cookie
+    const cookieStore = await cookies()
+    
+    // Clear any existing cookies
+    cookieStore.delete('token')
+    cookieStore.delete('user')
+    
+    // Set new cookies
+    cookieStore.set({
+      name: 'token',
+      value: data.token,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 // 24 hours
+    })
+
+    cookieStore.set({
+      name: 'user',
+      value: JSON.stringify({
+        id: data.user.id,
+        email: data.user.email,
+        first_name: data.user.first_name,
+        last_name: data.user.last_name,
+        role: data.user.role,
+        is_verified: data.user.is_verified,
+        associated_id: data.user.associated_id
+      }),
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 // 24 hours
+    })
+
+    // Return success with redirect path
+    let redirectPath = "/dashboard"
+    switch (data.user.role.toUpperCase()) {
       case "DOCTOR":
-        redirect("/doctor/dashboard")
+        redirectPath = "/doctor/dashboard"
+        break
       case "PATIENT":
-        redirect("/patient/dashboard")
-      case "LABORATORY":
-        redirect("/laboratory/dashboard")
-      case "PHARMACY":
-        redirect("/pharmacy/dashboard")
-      case "ASSISTANT":
-        redirect("/assistant/dashboard")
-      default:
-        redirect("/dashboard")
+        redirectPath = "/patient/dashboard"
+        break
+    }
+
+    return {
+      success: true,
+      message: "Login successful",
+      redirect: redirectPath
     }
   } catch (error) {
     return {

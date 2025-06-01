@@ -3,9 +3,34 @@ import type { NextRequest } from "next/server"
 import {auth} from "@/lib/auth";
 
 export async function middleware(request: NextRequest) {
-  //remove this to enable middleware
-  return NextResponse.next()
+  const token = request.cookies.get('token')
+  const user = request.cookies.get('user')
 
+  // Public paths that don't require authentication
+  const publicPaths = ['/auth/login', '/auth/register', '/auth/verify-code', '/auth/forgot-password']
+  const isPublicPath = publicPaths.some(path => request.nextUrl.pathname.startsWith(path))
+
+  // If trying to access a public path while logged in, redirect to dashboard
+  if (isPublicPath && token && user) {
+    try {
+      const userData = JSON.parse(user.value)
+      const dashboardPath = getDashboardPath(userData.role)
+      return NextResponse.redirect(new URL(dashboardPath, request.url))
+    } catch (error) {
+      // If there's an error parsing the user data, clear the cookies and continue
+      const response = NextResponse.next()
+      response.cookies.delete('token')
+      response.cookies.delete('user')
+      return response
+    }
+  }
+
+  // If trying to access a protected path without being logged in
+  if (!isPublicPath && (!token || !user)) {
+    const loginUrl = new URL('/auth/login', request.url)
+    loginUrl.searchParams.set('callbackUrl', request.nextUrl.pathname)
+    return NextResponse.redirect(loginUrl)
+  }
 
   const session = await auth()
   const isAuthenticated = !!session?.user
@@ -62,7 +87,27 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next()
 }
 
+function getDashboardPath(role: string): string {
+  switch (role.toUpperCase()) {
+    case 'DOCTOR':
+      return '/doctor/dashboard'
+    case 'PATIENT':
+      return '/patient/dashboard'
+    default:
+      return '/dashboard'
+  }
+}
+
 export const config = {
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
+    '/((?!_next/static|_next/image|favicon.ico|public).*)',
+  ],
 }
 

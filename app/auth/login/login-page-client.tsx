@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useActionState } from "react"
+import { useRouter } from "next/navigation"
 import { loginUser } from "@/actions/auth-actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,15 +19,29 @@ export default function LoginPageClient({
 }: {
   searchParams: { callbackUrl?: string; reset?: string }
 }) {
-  const [state, formAction] = useActionState(loginUser, { success: false, message: "" })
+  const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState("")
   const callbackUrl = searchParams.callbackUrl || "/dashboard"
   const showResetSuccess = searchParams.reset === "success"
 
   const handleSubmit = async (formData: FormData) => {
-    setIsSubmitting(true)
-    await formAction(formData)
-    setIsSubmitting(false)
+    try {
+      setIsSubmitting(true)
+      setError("")
+      
+      const result = await loginUser(null, formData)
+      
+      if (!result.success) {
+        setError(result.message || "An error occurred during login")
+      } else if (result.redirect) {
+        router.push(result.redirect)
+      }
+    } catch (err) {
+      setError("An error occurred during login")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -49,10 +63,10 @@ export default function LoginPageClient({
               </Alert>
             )}
 
-            {state.message && (
+            {error && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{state.message}</AlertDescription>
+                <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
 
