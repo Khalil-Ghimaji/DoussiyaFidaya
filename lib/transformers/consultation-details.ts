@@ -21,6 +21,7 @@ export interface BackendConsultationDetails {
     is_signed: boolean;
     status: string;
     medications: {
+      id: string;
       name: string;
       dosage: string;
       frequency: string;
@@ -28,13 +29,11 @@ export interface BackendConsultationDetails {
       quantity: string;
     }[];
   };
-  consultation_lab_requests: {
-    lab_requests: {
-      id: string;
-      type: string;
-      priority: string;
-      description: string;
-    };
+  lab_requests: {
+    id: string;
+    type: string;
+    priority: string;
+    description: string;
   }[];
   patients: {
     id: string;
@@ -132,18 +131,18 @@ export function transformConsultationDetails(backendConsultation: BackendConsult
       weight: backendConsultation.measures?.vital_signs?.weight || ''
     },
     prescriptions: backendConsultation.prescriptions ? backendConsultation.prescriptions.medications.map(medication => ({
-      _id: backendConsultation.prescriptions.id,
+      _id: medication.id,
       name: medication.name,
       dosage: medication.dosage,
       frequency: medication.frequency,
       duration: medication.duration,
       quantity: medication.quantity
     })) : [],
-    labRequests: backendConsultation.consultation_lab_requests.map(request => ({
-      _id: request.lab_requests.id,
-      type: request.lab_requests.type,
-      priority: request.lab_requests.priority,
-      description: request.lab_requests.description
+    labRequests: backendConsultation.lab_requests.map(request => ({
+      _id: request.id,
+      type: request.type,
+      priority: request.priority,
+      description: request.description
     })),
     patient: {
       _id: backendConsultation.patients.id,

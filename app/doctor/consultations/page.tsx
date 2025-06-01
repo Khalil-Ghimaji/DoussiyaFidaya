@@ -31,11 +31,12 @@ async function getDoctorConsultations() {
       GET_DOCTOR_CONSULTATIONS,
       {
         where: {
-          doctor_id: { equals: "4e1d7bb6-702c-4847-a09a-17796d2a2a36" },
-          date: {
-            gte: "2004-01-01T00:00:00Z",
-            lte: "2004-01-01T00:00:00Z"
-          }
+          doctor_id: { equals: "a9c3f34a-06b6-48be-b1c7-4e83b77e8680" },
+          // date: {
+          //   gte: startDate,
+          //   lte: endDate
+          // }
+        //uncomment this
         }
       },
       {

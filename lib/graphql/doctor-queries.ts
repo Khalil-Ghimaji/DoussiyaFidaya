@@ -109,8 +109,8 @@ export const GET_DOCTOR_CONSULTATIONS = `
       prescriptions {
         id
       }
-      consultation_lab_requests {
-        lab_request_id
+      lab_requests {
+        id
       }
       patients {
         id
@@ -147,13 +147,11 @@ export const GET_CONSULTATION_DETAILS = `
           quantity
         }
       }
-      consultation_lab_requests {
-        lab_requests {
-          id
-          type
-          priority
-          description
-        }
+      lab_requests {
+        id
+        type
+        priority
+        description
       }
       patients {
         id

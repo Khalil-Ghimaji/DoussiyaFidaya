@@ -19,7 +19,7 @@ export interface BackendConsultation {
   prescriptions?: {
     id: string;
   };
-  consultation_lab_requests: {
+  lab_requests: {
     id: string;
   }[];
 }
@@ -52,7 +52,7 @@ export function transformConsultation(backendConsultation: BackendConsultation):
     reason: backendConsultation.notes[0] || '',
     diagnosis: backendConsultation.measures?.diagnosis || '',
     hasPrescription: !!backendConsultation.prescriptions,
-    hasLabRequest: backendConsultation.consultation_lab_requests.length > 0,
+    hasLabRequest: backendConsultation.lab_requests.length > 0,
     patient: {
       _id: backendConsultation.patients.id,
       firstName: backendConsultation.patients.users.first_name,

@@ -9,9 +9,10 @@ import { Plus, Trash2 } from "lucide-react"
 
 type LabRequestFormProps = {
   form: UseFormReturn<{
-    section: string
+    reason: string
     notes?: string
-    measures: {
+    diagnosis: string
+    vitalSigns: {
       bloodPressure?: string
       heartRate?: string
       temperature?: string
@@ -20,37 +21,45 @@ type LabRequestFormProps = {
       weight?: string
     }
     prescriptions?: {
-      medications: {
-        name: string
-        dosage: string
-        frequency: string
-        duration: string
-        quantity: string
-      }[]
+      _id?: string
+      name: string
+      dosage: string
+      frequency: string
+      duration: string
+      quantity: string
     }[]
-    lab_requests?: {
+    labRequests?: {
+      _id?: string
       type: string
       description: string
+      priority: string
+      laboratory?: string
+      status?: string
+      resultId?: string
     }[]
-  }>
+  }>  
 }
 
 export default function LabRequestForm({ form }: LabRequestFormProps) {
-  const labRequests = form.watch("lab_requests") || []
+  const labRequests = form.watch("labRequests") || []
 
   const addLabRequest = () => {
-    form.setValue("lab_requests", [
+    form.setValue("labRequests", [
       ...labRequests,
       {
         type: "",
         description: "",
+        priority: "",
+        laboratory: "",
+        status: "",
+        resultId: "",
       },
     ])
   }
 
   const removeLabRequest = (index: number) => {
     form.setValue(
-      "lab_requests",
+      "labRequests",
       labRequests.filter((_, i) => i !== index)
     )
   }
@@ -73,7 +82,7 @@ export default function LabRequestForm({ form }: LabRequestFormProps) {
 
           <FormField
             control={form.control}
-            name={`lab_requests.${index}.type`}
+            name={`labRequests.${index}.type`}
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Type d'analyse</FormLabel>
@@ -87,7 +96,7 @@ export default function LabRequestForm({ form }: LabRequestFormProps) {
 
           <FormField
             control={form.control}
-            name={`lab_requests.${index}.description`}
+            name={`labRequests.${index}.description`}
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Description</FormLabel>

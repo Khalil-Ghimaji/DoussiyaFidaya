@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input"
 
 type VitalSignsFormProps = {
   form: UseFormReturn<{
-    section: string
+    reason: string
     notes?: string
-    measures: {
+    diagnosis: string
+    vitalSigns: {
       bloodPressure?: string
       heartRate?: string
       temperature?: string
@@ -17,19 +18,23 @@ type VitalSignsFormProps = {
       weight?: string
     }
     prescriptions?: {
-      medications: {
-        name: string
-        dosage: string
-        frequency: string
-        duration: string
-        quantity: string
-      }[]
+      _id?: string
+      name: string
+      dosage: string
+      frequency: string
+      duration: string
+      quantity: string
     }[]
-    lab_requests?: {
+    labRequests?: {
+      _id?: string
       type: string
       description: string
+      priority: string
+      laboratory?: string
+      status?: string
+      resultId?: string
     }[]
-  }>
+  }>  
 }
 
 export default function VitalSignsForm({ form }: VitalSignsFormProps) {
@@ -37,7 +42,7 @@ export default function VitalSignsForm({ form }: VitalSignsFormProps) {
     <div className="space-y-4">
       <FormField
         control={form.control}
-        name="measures.bloodPressure"
+        name="vitalSigns.bloodPressure"
         render={({ field }) => (
           <FormItem>
             <FormLabel>Tension artérielle (mmHg)</FormLabel>
@@ -51,7 +56,7 @@ export default function VitalSignsForm({ form }: VitalSignsFormProps) {
 
       <FormField
         control={form.control}
-        name="measures.heartRate"
+        name="vitalSigns.heartRate"
         render={({ field }) => (
           <FormItem>
             <FormLabel>Fréquence cardiaque (bpm)</FormLabel>
@@ -65,7 +70,7 @@ export default function VitalSignsForm({ form }: VitalSignsFormProps) {
 
       <FormField
         control={form.control}
-        name="measures.temperature"
+        name="vitalSigns.temperature"
         render={({ field }) => (
           <FormItem>
             <FormLabel>Température (°C)</FormLabel>
@@ -79,7 +84,7 @@ export default function VitalSignsForm({ form }: VitalSignsFormProps) {
 
       <FormField
         control={form.control}
-        name="measures.respiratoryRate"
+        name="vitalSigns.respiratoryRate"
         render={({ field }) => (
           <FormItem>
             <FormLabel>Fréquence respiratoire (rpm)</FormLabel>
@@ -93,7 +98,7 @@ export default function VitalSignsForm({ form }: VitalSignsFormProps) {
 
       <FormField
         control={form.control}
-        name="measures.oxygenSaturation"
+        name="vitalSigns.oxygenSaturation"
         render={({ field }) => (
           <FormItem>
             <FormLabel>Saturation en oxygène (%)</FormLabel>
@@ -107,7 +112,7 @@ export default function VitalSignsForm({ form }: VitalSignsFormProps) {
 
       <FormField
         control={form.control}
-        name="measures.weight"
+        name="vitalSigns.weight"
         render={({ field }) => (
           <FormItem>
             <FormLabel>Poids (kg)</FormLabel>

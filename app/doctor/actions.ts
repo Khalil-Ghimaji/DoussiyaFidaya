@@ -509,24 +509,27 @@ export async function createAppointment(data: any) {
 }
 
 const UPDATE_CONSULTATION = `
-  mutation updateOneConsultations($data: ConsultationsUpdateInput!, $where: ConsultationsWhereUniqueInput!) {
-    updateOneConsultations(data: $data, where: $where) {
-      id
-    }
+  mutation UpdateConsutation($data1: ConsultationsUpdateInput!,$data2: ConsultationsUpdateInput!, $where: ConsultationsWhereUniqueInput!) {
+  updateOneToOne:updateOneConsultations(where: $where, data: $data1) {
+    id
   }
+  updateOneToMany:updateOneConsultations(where:$where,data:$data2){
+    id
+  }
+}
 `
 
-export async function updateConsultation(id: string, values: {
+export async function updateConsultation(id: string, patientId: string, values: {
   reason: string
-  notes: string
+  notes?: string
   diagnosis: string
   vitalSigns: {
-    bloodPressure: string
-    heartRate: string
-    temperature: string
-    respiratoryRate: string
-    oxygenSaturation: string
-    weight: string
+    bloodPressure?: string
+    heartRate?: string
+    temperature?: string
+    respiratoryRate?: string
+    oxygenSaturation?: string
+    weight?: string
   }
   prescriptions?: {
     _id?: string
@@ -541,13 +544,18 @@ export async function updateConsultation(id: string, values: {
     type: string
     priority: string
     description: string
+    laboratory?: string
+    status?: string
+    resultId?: string
   }[]
 }) {
+  console.log("i arrived here in the action")
   try {
+    console.log("i arrived there in the action")
     // Transform frontend values to backend format
-    const data = {
+    const data1 = {
       notes: {
-        set: [values.reason, ...values.notes.split('\n').filter(note => note.trim())]
+        set: [values.reason, ...(values.notes?.split('\n').filter(note => note.trim()) || [] )]
       },
       measures: {
         set: {
@@ -563,47 +571,76 @@ export async function updateConsultation(id: string, values: {
         }
       },
       prescriptions: values.prescriptions ? {
-        update: {
-          medications: {
-            deleteMany: {},
-            createMany: {
-              data: values.prescriptions.map(prescription => ({
-                name: prescription.name,
-                dosage: prescription.dosage,
-                frequency: prescription.frequency,
-                duration: prescription.duration,
-                quantity: prescription.quantity
-              }))
+        upsert:{
+          update: {
+            medications: {
+              deleteMany: {}
+            }
+          },
+          create: {
+            date: new Date(),
+            is_signed: false,
+            status: "pending",
+            patients:{
+              connect:{
+                id: patientId
+              }
             }
           }
         }
       } : undefined,
-      consultation_lab_requests: values.labRequests ? {
-        deleteMany: {},
-        createMany: {
+      lab_requests: values.labRequests ? {
+        deleteMany: {}
+      } : undefined
+    }
+    console.log("update consultation data", data1)
+    const data2 = {
+      prescriptions: values.prescriptions? {
+        update: {
+          data: {
+            medications: {
+              createMany: {
+                data:  values.prescriptions.map(medication => ({
+                  name: medication.name,
+                  dosage: medication.dosage,
+                  frequency: medication.frequency,
+                  duration: medication.duration,
+                  quantity: medication.quantity
+                }))
+              }
+            }
+          }
+        }
+      }:{},
+      lab_requests: values.labRequests ? {
+        create: {
           data: values.labRequests.map(request => ({
-            lab_requests: {
-              create: {
-                type: request.type,
-                priority: request.priority,
-                description: request.description
+            type: request.type,
+            priority: request.priority,
+            description: request.description,
+            patients:{
+              connect:{
+                id: patientId
               }
             }
           }))
         }
-      } : undefined
+      }:{}
     }
-    console.log("update consultation data", data)
+    console.log("i arrived here")
     const result = await sendGraphQLMutation<{ updateOneConsultations: { id: string } }>(
       UPDATE_CONSULTATION,
       {
         where: { id },
-        data
+        data1,
+        data2
       }
     )
+    console.log("this is the result", result)
 
     return { success: true }
   } catch (error) {
+    console.log("i arrived here in the catch")
     console.error("Error updating consultation:", error)
     return { success: false, message: error instanceof Error ? error.message : "Une erreur est survenue" }
   }

@@ -132,16 +132,16 @@ export function NewAppointmentForm({ patients }: { patients: Patient[] }) {
 
       const result = await createAppointment(formDataToSubmit)
 
-      if (result.success) {
+      if (result.id) {
         toast({
           title: "Succès",
-          description: result.message,
+          description: 'Appointment created successfully', // a changer
         })
         router.push("/doctor/appointments")
       } else {
         toast({
           title: "Erreur",
-          description: result.message,
+          description: 'Une erreur est survenue', // a changer
           variant: "destructive",
         })
       }
@@ -158,156 +158,156 @@ export function NewAppointmentForm({ patients }: { patients: Patient[] }) {
   }
 
   return (
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="patient">Patient</Label>
-              <Select
-                  value={formData.patientId}
-                  onValueChange={(value) => setFormData({ ...formData, patientId: value })}
-                  required
-              >
-                <SelectTrigger id="patient">
-                  <SelectValue placeholder="Sélectionnez un patient" />
-                </SelectTrigger>
-                <SelectContent>
-                  {patients.map((patient) => (
-                      <SelectItem key={patient._id} value={patient._id}>
-                        {patient.firstName} {patient.lastName} ({patient.age} ans)
-                      </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                      variant="outline"
-                      className={cn("w-full justify-start text-left font-normal", !date && "text-muted-foreground")}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date ? format(date, "PPP", { locale: fr }) : "Sélectionnez une date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                      mode="single"
-                      selected={date}
-                      onSelect={handleDateChange}
-                      initialFocus
-                      disabled={(date) =>
-                          date < new Date() || date > new Date(new Date().setMonth(new Date().getMonth() + 3))
-                      }
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="time">Horaire</Label>
-              <Select
-                  value={formData.time}
-                  onValueChange={(value) => setFormData({ ...formData, time: value })}
-                  disabled={!date || isLoadingSlots}
-                  required
-              >
-                <SelectTrigger id="time">
-                  <SelectValue placeholder={isLoadingSlots ? "Chargement..." : "Sélectionnez un horaire"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {timeSlots.length > 0 ? (
-                      timeSlots.map((slot) => (
-                          <SelectItem key={slot.time} value={slot.time} disabled={!slot.available}>
-                            {slot.time} {!slot.available && "(Indisponible)"}
-                          </SelectItem>
-                      ))
-                  ) : (
-                      <SelectItem value="" disabled>
-                        {date ? "Aucun créneau disponible" : "Sélectionnez d'abord une date"}
-                      </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="duration">Durée (minutes)</Label>
-              <Select
-                  value={formData.duration}
-                  onValueChange={(value) => setFormData({ ...formData, duration: value })}
-                  required
-              >
-                <SelectTrigger id="duration">
-                  <SelectValue placeholder="Sélectionnez une durée" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="15">15 minutes</SelectItem>
-                  <SelectItem value="30">30 minutes</SelectItem>
-                  <SelectItem value="45">45 minutes</SelectItem>
-                  <SelectItem value="60">1 heure</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="type">Type de rendez-vous</Label>
-              <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })} required>
-                <SelectTrigger id="type">
-                  <SelectValue placeholder="Sélectionnez un type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="consultation">Consultation</SelectItem>
-                  <SelectItem value="followup">Suivi</SelectItem>
-                  <SelectItem value="emergency">Urgence</SelectItem>
-                  <SelectItem value="procedure">Procédure médicale</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="patient">Patient</Label>
+            <Select
+              value={formData.patientId}
+              onValueChange={(value) => setFormData({ ...formData, patientId: value })}
+              required
+            >
+              <SelectTrigger id="patient">
+                <SelectValue placeholder="Sélectionnez un patient" />
+              </SelectTrigger>
+              <SelectContent>
+                {patients.map((patient) => (
+                  <SelectItem key={patient._id} value={patient._id}>
+                    {patient.firstName} {patient.lastName} ({patient.age} ans)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="reason">Motif du rendez-vous</Label>
-            <Input
-                id="reason"
-                value={formData.reason}
-                onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                placeholder="Motif du rendez-vous"
-                required
-            />
+            <Label>Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn("w-full justify-start text-left font-normal", !date && "text-muted-foreground")}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {date ? format(date, "PPP", { locale: fr }) : "Sélectionnez une date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={handleDateChange}
+                  initialFocus
+                  disabled={(date) =>
+                    date < new Date() || date > new Date(new Date().setMonth(new Date().getMonth() + 3))
+                  }
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes (optionnel)</Label>
-            <Textarea
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Notes supplémentaires"
-                rows={4}
-            />
+            <Label htmlFor="time">Horaire</Label>
+            <Select
+              value={formData.time}
+              onValueChange={(value) => setFormData({ ...formData, time: value })}
+              disabled={!date || isLoadingSlots}
+              required
+            >
+              <SelectTrigger id="time">
+                <SelectValue placeholder={isLoadingSlots ? "Chargement..." : "Sélectionnez un horaire"} />
+              </SelectTrigger>
+              <SelectContent>
+                {timeSlots.length > 0 ? (
+                  timeSlots.map((slot) => (
+                    <SelectItem key={slot.time} value={slot.time} disabled={!slot.available}>
+                      {slot.time} {!slot.available && "(Indisponible)"}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="" disabled>
+                    {date ? "Aucun créneau disponible" : "Sélectionnez d'abord une date"}
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="duration">Durée (minutes)</Label>
+            <Select
+              value={formData.duration}
+              onValueChange={(value) => setFormData({ ...formData, duration: value })}
+              required
+            >
+              <SelectTrigger id="duration">
+                <SelectValue placeholder="Sélectionnez une durée" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="15">15 minutes</SelectItem>
+                <SelectItem value="30">30 minutes</SelectItem>
+                <SelectItem value="45">45 minutes</SelectItem>
+                <SelectItem value="60">1 heure</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="type">Type de rendez-vous</Label>
+            <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })} required>
+              <SelectTrigger id="type">
+                <SelectValue placeholder="Sélectionnez un type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="consultation">Consultation</SelectItem>
+                <SelectItem value="followup">Suivi</SelectItem>
+                <SelectItem value="emergency">Urgence</SelectItem>
+                <SelectItem value="procedure">Procédure médicale</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
-        <div className="flex justify-end gap-4">
-          <Button type="button" variant="outline" onClick={() => router.back()}>
-            Annuler
-          </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Création en cours...
-                </>
-            ) : (
-                "Créer le rendez-vous"
-            )}
-          </Button>
+        <div className="space-y-2">
+          <Label htmlFor="reason">Motif du rendez-vous</Label>
+          <Input
+            id="reason"
+            value={formData.reason}
+            onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+            placeholder="Motif du rendez-vous"
+            required
+          />
         </div>
-      </form>
+
+        <div className="space-y-2">
+          <Label htmlFor="notes">Notes (optionnel)</Label>
+          <Textarea
+            id="notes"
+            value={formData.notes}
+            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+            placeholder="Notes supplémentaires"
+            rows={4}
+          />
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-4">
+        <Button type="button" variant="outline" onClick={() => router.back()}>
+          Annuler
+        </Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Création en cours...
+            </>
+          ) : (
+            "Créer le rendez-vous"
+          )}
+        </Button>
+      </div>
+    </form>
   )
 }
 
