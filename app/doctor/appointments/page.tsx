@@ -11,6 +11,7 @@ import { DoctorAppointmentsTable } from "@/components/doctor/appointments-table"
 import { AppointmentFilters } from "@/components/doctor/appointment-filters"
 import { gql } from "@apollo/client"
 import { format, parseISO, isSameDay } from "date-fns"
+import { cookies } from "next/headers"
 
 // Using dynamic rendering for appointments page to ensure fresh data
 export const dynamic = "force-dynamic"
@@ -208,6 +209,8 @@ async function DoctorAppointmentsContent({
   // }
 
   // Temporary doctor ID for testing
+  const cookieStore = await cookies()
+  console.log("**********************Cookies:********************", cookieStore.getAll())
   const tempDoctorId = "3665a171-9626-4ee1-a1dd-086a1e445c2d" // Replace with an actual doctor ID from your database
 
   // Parse filters from search params

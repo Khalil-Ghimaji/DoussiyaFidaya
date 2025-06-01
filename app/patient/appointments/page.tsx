@@ -6,6 +6,8 @@ import { AppointmentsClient } from "./appointments-client"
 import {fetchGraphQL} from "@/lib/graphql-client";
 import {auth} from "@/lib/auth";
 import { gql } from '@apollo/client';
+import { cookies } from "next/headers"
+
 
 interface Doctor {
   bio: string | null
@@ -101,6 +103,30 @@ export default async function PatientAppointmentsPage() {
 }
 
 async function AppointmentsContent() {
+  // decode user cookie
+  const cookieStore = await cookies();
+  const userCookie = cookieStore.get("user");
+
+  let user = null;
+  if (userCookie?.value) {
+    try {
+      user = JSON.parse(userCookie.value);
+    
+    } catch (e) {
+      console.error("Failed to parse user cookie:", e);
+    }
+  }
+
+  // Example usage:
+  console.log("User ID:", user?.id);
+  console.log("User Email:", user?.email);
+  console.log("User First Name:", user?.first_name);
+  console.log("associated_id:", user?.associated_id);
+
+  // decode token 
+  const token = cookieStore.get("token")?.value || "";
+ 
+
   const testId = "0c04a7d3-cfe7-4b2c-8a0f-7fe245b82230"
   const { data } = await fetchGraphQL<{  findManyRdv_requests: Appointment[] }>(GET_PATIENT_APPOINTMENTS, {
     patient_id: {

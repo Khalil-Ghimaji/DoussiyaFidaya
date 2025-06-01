@@ -111,6 +111,27 @@ export async function loginUser(prevState: ActionState | null, formData: FormDat
     })
 
     cookieStore.set({
+      name: 'userId',
+      value: data.user.id,
+    })
+
+    cookieStore.set({
+      name: 'role',
+      value: data.user.role,
+    })
+
+    cookieStore.set({
+      name: 'associatedId',
+      value: data.user.associated_id || '',
+    })
+
+    cookieStore.set({
+      name: 'cin',
+      value: data.user.associated_data.cin || 0,
+    })
+    
+
+    cookieStore.set({
       name: 'user',
       value: JSON.stringify({
         id: data.user.id,
@@ -118,9 +139,11 @@ export async function loginUser(prevState: ActionState | null, formData: FormDat
         first_name: data.user.first_name,
         last_name: data.user.last_name,
         role: data.user.role,
-        is_verified: data.user.is_verified,
-        associated_id: data.user.associated_id
+        associated_id: data.user.associated_id,
+        profile_picture: data.user.profile_picture || null,
+        associated_data: data.user.associated_data || null
       }),
+      httpOnly: false, // Make this accessible to client-side scripts
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 // 24 hours
@@ -333,9 +356,11 @@ export async function logout() {
   const response = await fetch("/api/auth/logout", {
     method: 'POST',
   })
+  
 
   if (response.ok) {
     redirect("/auth/login")
   }
+  return {redirect: "/auth/login"}
 }
 
