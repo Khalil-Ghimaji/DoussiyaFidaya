@@ -3,11 +3,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
-import { fetchGraphQL } from "@/lib/server/graphql-client"
 import { GET_DOCTOR_PATIENTS } from "@/lib/server/doctor-queries"
 import { auth } from "@/lib/auth"
 import { notFound } from "next/navigation"
 import { NewAppointmentForm } from "./new-appointment-form"
+import {fetchGraphQL} from "@/lib/graphql-client";
 
 // Using dynamic rendering for new appointment page to ensure fresh data
 export const dynamic = "force-dynamic"
@@ -19,19 +19,7 @@ async function NewAppointmentContent() {
   }
 
   try {
-    const data = await fetchGraphQL<{
-      doctorPatients: Array<{
-        _id: string
-        firstName: string
-        lastName: string
-        avatar: string
-        initials: string
-        age: number
-        gender: string
-        bloodType: string
-        lastVisit: string
-      }>
-    }>(GET_DOCTOR_PATIENTS, { doctorId: session.user.id }, "no-store")
+    const data = await fetchGraphQL()
 
     const patients = data.doctorPatients
 

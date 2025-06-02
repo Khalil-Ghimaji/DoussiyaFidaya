@@ -132,16 +132,16 @@ export function NewAppointmentForm({ patients }: { patients: Patient[] }) {
 
       const result = await createAppointment(formDataToSubmit)
 
-      if (result.success) {
+      if (result.id) {
         toast({
           title: "Succès",
-          description: result.message,
+          description: 'Appointment created successfully', // a changer
         })
         router.push("/doctor/appointments")
       } else {
         toast({
           title: "Erreur",
-          description: result.message,
+          description: 'Une erreur est survenue', // a changer
           variant: "destructive",
         })
       }

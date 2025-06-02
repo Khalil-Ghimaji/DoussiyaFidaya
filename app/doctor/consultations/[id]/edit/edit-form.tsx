@@ -101,6 +101,7 @@ const formSchema = z.object({
         _id: z.string().optional(),
         type: z.string().min(1, "Le type d'analyse est requis"),
         priority: z.string().min(1, "La priorité est requise"),
+        description: z.string().min(1, "La description est requise"),
         laboratory: z.string().optional(),
         status: z.string().optional(),
         resultId: z.string().optional(),
@@ -136,9 +137,9 @@ export function EditConsultationForm({ consultation }: { consultation: Consultat
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       setIsSubmitting(true)
-
-      const result = await updateConsultation(consultation._id, values)
-
+      console.log("i arrived here in the form")
+      const result = await updateConsultation(consultation._id, consultation.patient._id, values)
+      console.log("this is theresult", result)
       if (result.success) {
         toast({
           title: "Consultation mise à jour",
@@ -155,6 +156,7 @@ export function EditConsultationForm({ consultation }: { consultation: Consultat
         description: "Impossible de mettre à jour la consultation. Veuillez réessayer.",
         variant: "destructive",
       })
+      console.log("i arrived here in the form catch")
       console.error("Error updating consultation:", error)
     } finally {
       setIsSubmitting(false)

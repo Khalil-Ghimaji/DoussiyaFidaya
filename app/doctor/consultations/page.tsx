@@ -6,56 +6,47 @@ import { executeGraphQLServer } from "@/lib/graphql-server"
 import { GET_DOCTOR_CONSULTATIONS } from "@/lib/graphql/doctor-queries"
 import { auth } from "@/lib/auth"
 import { ConsultationsFilters } from "./consultations-filters"
+import { BackendConsultation, FrontendConsultation, transformConsultations } from "@/lib/transformers/consultation"
 
 // Define the consultation type
-export type Consultation = {
-  _id: string
-  date: string
-  time: string
-  reason: string
-  diagnosis: string
-  hasPrescription: boolean
-  hasLabRequest: boolean
-  patient: {
-    _id: string
-    firstName: string
-    lastName: string
-    dateOfBirth: string
-    gender: string
-    profileImage: string
-  }
-}
+export type Consultation = FrontendConsultation
 
 // Get consultations from the server
 async function getDoctorConsultations() {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      throw new Error("User not authenticated")
-    }
+    // const session = await auth()
+    // if (!session?.user?.id) {
+    //   throw new Error("User not authenticated")
+    // }
 
     // Default to fetching consultations for the last 30 days
     const today = new Date()
     const thirtyDaysAgo = new Date(today)
     thirtyDaysAgo.setDate(today.getDate() - 30)
 
-    const startDate = thirtyDaysAgo.toISOString().split("T")[0]
-    const endDate = today.toISOString().split("T")[0]
+    const startDate = thirtyDaysAgo.toISOString()
+    const endDate = today.toISOString()
 
-    const data = await executeGraphQLServer<{ doctorConsultations: Consultation[] }>(
+    const data = await executeGraphQLServer<{ findManyConsultations: BackendConsultation[] }>(
       GET_DOCTOR_CONSULTATIONS,
       {
-        doctorId: session.user.id,
-        startDate,
-        endDate,
+        where: {
+          doctor_id: { equals: "a9c3f34a-06b6-48be-b1c7-4e83b77e8680" },
+          // date: {
+          //   gte: startDate,
+          //   lte: endDate
+          // }
+        //uncomment this
+        }
       },
       {
         cache: "no-store", // Use SSR for up-to-date data
         tags: ["consultations"],
       },
     )
+    console.log("these are the consultations data", data)
 
-    return data.doctorConsultations
+    return transformConsultations(data.findManyConsultations)
   } catch (error) {
     console.error("Error fetching doctor consultations:", error)
     return []
