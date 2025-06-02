@@ -14,8 +14,7 @@ import { useNotifications } from "@/components/notification-provider"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 
-export function NotificationBell() {
-  const { data: session } = useSession()
+export function NotificationBell({ user }: { user: any }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const {
@@ -35,11 +34,11 @@ export function NotificationBell() {
 
     // Rediriger en fonction du type de notification
     if (notification.type === "appointment") {
-      router.push(`/${session?.user?.role}/appointments`)
+      router.push(`/${user.role}/appointments`)
     } else if (notification.type === "prescription") {
-      router.push(`/${session?.user?.role}/prescriptions`)
+      router.push(`/${user.role}/prescriptions`)
     } else if (notification.type === "lab_result") {
-      router.push(`/${session?.user?.role}/lab-results`)
+      router.push(`/${user.role}/lab-results`)
     } else if (notification.type === "emergency_access") {
       router.push("/patient/authorizations")
     } else if (notification.type === "access_granted") {
@@ -86,7 +85,7 @@ export function NotificationBell() {
     }
   }
 
-  if (!session?.user) return null
+  if (!user) return null
 
   return (
       <Popover open={open} onOpenChange={setOpen}>

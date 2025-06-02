@@ -28,17 +28,17 @@ export const GET_USER_PROFILE = gql`
 `
 
 export const GET_CURRENT_USER = gql`
-  query GetCurrentUser {
-    currentUser {
-      id
-      firstName
-      lastName
-      email
-      role
-      profilePicture
-      isVerified
-      lastLogin
+    query MyQuery($id: String = "") {
+        findFirstUsers(where: {id: {equals: $id}}) {
+            first_name
+            email
+            id
+            is_verified
+            last_login
+            last_name
+            role
+            profile_picture
+        }
     }
-  }
 `
 

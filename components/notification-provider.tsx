@@ -1,8 +1,14 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState, useCallback } from "react"
-import { useSession } from "next-auth/react"
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  useRef
+} from "react"
 import { useToast } from "@/hooks/use-toast"
 import { Bell, CheckCircle, Info, AlertTriangle } from "lucide-react"
 
@@ -44,225 +50,263 @@ interface NotificationProviderProps {
 }
 
 export function NotificationProvider({ children }: NotificationProviderProps) {
-  const { data: session } = useSession()
   const { toast } = useToast()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
-  const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected" | "disconnected" | "error">(
-    "disconnected",
-  )
-  const [eventSource, setEventSource] = useState<EventSource | null>(null)
+  const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected" | "disconnected" | "error">("disconnected")
   const [retryCount, setRetryCount] = useState(0)
-  const [retryTimeout, setRetryTimeout] = useState<NodeJS.Timeout | null>(null)
-  const [notificationToDelete, setNotificationToDelete] = useState<Notification | null>(null)
+
+  // Use refs to store mutable values that don't trigger re-renders
+  const eventSourceRef = useRef<EventSource | null>(null)
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const isUnmountedRef = useRef(false)
 
   const maxRetries = 5
   const baseRetryDelay = 1000 // 1 second
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
-      case "appointment":
-        return <Bell className="h-4 w-4" />
-      case "prescription":
-        return <CheckCircle className="h-4 w-4" />
-      case "lab_result":
-        return <Info className="h-4 w-4" />
-      case "emergency_access":
-        return <AlertTriangle className="h-4 w-4" />
-      case "access_granted":
-        return <CheckCircle className="h-4 w-4" />
-      case "message":
-        return <Info className="h-4 w-4" />
-      default:
-        return <Bell className="h-4 w-4" />
+      case "appointment": return <Bell className="h-4 w-4" />
+      case "prescription": return <CheckCircle className="h-4 w-4" />
+      case "lab_result": return <Info className="h-4 w-4" />
+      case "emergency_access": return <AlertTriangle className="h-4 w-4" />
+      case "access_granted": return <CheckCircle className="h-4 w-4" />
+      case "message": return <Info className="h-4 w-4" />
+      default: return <Bell className="h-4 w-4" />
     }
   }
 
   const getNotificationVariant = (type: string) => {
     switch (type) {
-      case "emergency_access":
-        return "destructive"
+      case "emergency_access": return "destructive"
       case "access_granted":
-      case "prescription":
-        return "default"
-      default:
-        return "default"
+      case "prescription": return "default"
+      default: return "default"
     }
   }
 
-  const showToastNotification = useCallback(
-    (notification: Notification) => {
-      const icon = getNotificationIcon(notification.type)
-      const variant = getNotificationVariant(notification.type)
+  const showToastNotification = useCallback((notification: Notification) => {
+    const icon = getNotificationIcon(notification.type)
+    const variant = getNotificationVariant(notification.type)
 
-      toast({
-        title: "Nouvelle notification",
-        description: (
+    toast({
+      title: "Nouvelle notification",
+      description: (
           <div className="flex items-center gap-2">
             {icon}
             <span>{notification.content}</span>
           </div>
-        ),
-        variant: variant as any,
-        duration: 5000,
-      })
-    },
-    [toast],
-  )
+      ),
+      variant: variant as any,
+      duration: 5000,
+    })
+  }, [toast])
+
+  const cleanupConnection = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+      eventSourceRef.current = null
+    }
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current)
+      retryTimeoutRef.current = null
+    }
+  }, [])
 
   const connectToSSE = useCallback(() => {
-    if (!session?.user) return
+    // Prevent connection if component is unmounted
+    if (isUnmountedRef.current) return
 
-    // Close existing connection
-    if (eventSource) {
-      eventSource.close()
-    }
+    // Clean up any existing connection
+    cleanupConnection()
 
     setConnectionStatus("connecting")
 
-    const url = `/api/sse?userId=${session.user.id}&token=${session.user.accessToken || ""}`
-    const newEventSource = new EventSource(url)
+    try {
+      const es = new EventSource("/api/sse-proxy")
+      eventSourceRef.current = es
 
-    newEventSource.onopen = () => {
-      console.log("SSE connection opened")
-      setConnectionStatus("connected")
-      setRetryCount(0)
-      if (retryTimeout) {
-        clearTimeout(retryTimeout)
-        setRetryTimeout(null)
+      es.onopen = () => {
+        if (isUnmountedRef.current) return
+        console.log("SSE connection opened")
+        setConnectionStatus("connected")
+        setRetryCount(0)
       }
-    }
 
-    newEventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data)
+      es.onmessage = (event) => {
+        if (isUnmountedRef.current) return
 
-        if (data.type === "notification") {
-          const newNotification = data.notification
+        try {
+          console.log("SSE message received:", event.data)
+          const parsedData = JSON.parse(event.data)
 
-          // Add to notifications list
-          setNotifications((prev) => [newNotification, ...prev])
+          // Handle your specific event format
+          if (parsedData.eventName && parsedData.entity) {
+            // Convert your server's format to notification format
+            if (parsedData.eventName.includes('users.') && parsedData.eventName.includes('.updated')) {
+              const newNotification: Notification = {
+                _id: parsedData.entity.id || Date.now().toString(),
+                type: "message",
+                content: `User ${parsedData.entity.first_name} ${parsedData.entity.last_name} has been updated`,
+                read: false,
+                createdAt: parsedData.entity.updated_at || new Date().toISOString(),
+                relatedPatient: {
+                  _ref: parsedData.entity.id,
+                  firstName: parsedData.entity.first_name,
+                  lastName: parsedData.entity.last_name
+                }
+              }
 
-          // Update unread count
-          if (!newNotification.read) {
-            setUnreadCount((prev) => prev + 1)
+              setNotifications((prev) => {
+                // Avoid duplicates
+                const exists = prev.some(n => n._id === newNotification._id)
+                if (exists) return prev
+                return [newNotification, ...prev]
+              })
+
+              setUnreadCount((prev) => prev + 1)
+              showToastNotification(newNotification)
+            }
           }
+          // Handle standard notification format
+          else if (parsedData.type === "notification") {
+            const newNotification = parsedData.notification
+            setNotifications((prev) => {
+              // Avoid duplicates
+              const exists = prev.some(n => n._id === newNotification._id)
+              if (exists) return prev
+              return [newNotification, ...prev]
+            })
 
-          // Show toast notification
-          showToastNotification(newNotification)
-        } else if (data.type === "initial_notifications") {
-          // Handle initial notifications load
-          setNotifications(data.notifications || [])
-          setUnreadCount(data.notifications?.filter((n: Notification) => !n.read).length || 0)
-        } else if (data.type === "heartbeat") {
-          // Handle heartbeat to keep connection alive
-          console.log("SSE heartbeat received")
+            if (!newNotification.read) {
+              setUnreadCount((prev) => prev + 1)
+            }
+            showToastNotification(newNotification)
+
+          } else if (parsedData.type === "initial_notifications") {
+            setNotifications(parsedData.notifications || [])
+            setUnreadCount(parsedData.notifications?.filter((n: Notification) => !n.read).length || 0)
+
+          } else if (parsedData.type === "ping" || parsedData.type === "heartbeat") {
+            // Handle keepalive messages
+            console.log("Received keepalive message")
+          } else {
+            console.log("Unhandled SSE message type:", parsedData)
+          }
+        } catch (err) {
+          console.error("Error parsing SSE message:", err, "Raw data:", event.data)
         }
-      } catch (error) {
-        console.error("Error parsing SSE message:", error)
       }
-    }
 
-    newEventSource.onerror = (error) => {
-      console.error("SSE connection error:", error)
+      es.onerror = (error) => {
+        if (isUnmountedRef.current) return
+
+        console.error("SSE connection error:", error)
+        setConnectionStatus("error")
+
+        // Close the connection
+        es.close()
+
+        if (retryCount < maxRetries) {
+          const delay = baseRetryDelay * Math.pow(2, retryCount)
+          console.log(`Retrying SSE connection in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`)
+
+          retryTimeoutRef.current = setTimeout(() => {
+            if (isUnmountedRef.current) return
+            setRetryCount((prev) => prev + 1)
+            connectToSSE()
+          }, delay)
+
+          toast({
+            title: "Connexion interrompue",
+            description: `Tentative de reconnexion... (${retryCount + 1}/${maxRetries})`,
+            variant: "destructive",
+            duration: 3000,
+          })
+        } else {
+          setConnectionStatus("disconnected")
+          toast({
+            title: "Connexion échouée",
+            description: "Impossible de se connecter aux notifications en temps réel. Veuillez rafraîchir la page.",
+            variant: "destructive",
+            duration: 10000,
+          })
+        }
+      }
+
+    } catch (err) {
+      console.error("Failed to initialize SSE:", err)
       setConnectionStatus("error")
-      newEventSource.close()
-
-      // Implement exponential backoff for retries
-      if (retryCount < maxRetries) {
-        const delay = baseRetryDelay * Math.pow(2, retryCount)
-        console.log(`Retrying SSE connection in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`)
-
-        const timeout = setTimeout(() => {
-          setRetryCount((prev) => prev + 1)
-          connectToSSE()
-        }, delay)
-
-        setRetryTimeout(timeout)
-
-        toast({
-          title: "Connexion interrompue",
-          description: `Tentative de reconnexion... (${retryCount + 1}/${maxRetries})`,
-          variant: "destructive",
-          duration: 3000,
-        })
-      } else {
-        setConnectionStatus("disconnected")
-        toast({
-          title: "Connexion échouée",
-          description: "Impossible de se connecter aux notifications en temps réel. Veuillez rafraîchir la page.",
-          variant: "destructive",
-          duration: 10000,
-        })
-      }
     }
-
-    setEventSource(newEventSource)
-  }, [session, eventSource, retryCount, retryTimeout, showToastNotification, toast])
+  }, [retryCount, toast, showToastNotification, cleanupConnection])
 
   const retryConnection = useCallback(() => {
+    console.log("Manual retry connection requested")
     setRetryCount(0)
     connectToSSE()
   }, [connectToSSE])
 
   const markAsRead = useCallback(async (notificationId: string) => {
     try {
-      // Optimistically update UI
+      // Optimistic update
       setNotifications((prev) => prev.map((n) => (n._id === notificationId ? { ...n, read: true } : n)))
       setUnreadCount((prev) => Math.max(0, prev - 1))
 
-      // Make API call
       const response = await fetch("/api/notifications/mark-read", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({ notificationId }),
       })
 
-      if (!response.ok) {
-        throw new Error("Failed to mark notification as read")
-      }
+      if (!response.ok) throw new Error(`Failed to mark as read: ${response.statusText}`)
     } catch (error) {
-      console.error("Error marking notification as read:", error)
       // Revert optimistic update
       setNotifications((prev) => prev.map((n) => (n._id === notificationId ? { ...n, read: false } : n)))
       setUnreadCount((prev) => prev + 1)
+      console.error("Mark as read failed:", error)
+
+      toast({
+        title: "Erreur",
+        description: "Impossible de marquer la notification comme lue",
+        variant: "destructive",
+      })
     }
-  }, [])
+  }, [toast])
 
   const markAllAsRead = useCallback(async () => {
     try {
       const unreadNotifications = notifications.filter((n) => !n.read)
 
-      // Optimistically update UI
+      // Optimistic update
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
       setUnreadCount(0)
 
-      // Make API call
       const response = await fetch("/api/notifications/mark-all-read", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
       })
 
-      if (!response.ok) {
-        throw new Error("Failed to mark all notifications as read")
-      }
+      if (!response.ok) throw new Error(`Failed to mark all as read: ${response.statusText}`)
 
       toast({
         title: "Succès",
         description: "Toutes les notifications ont été marquées comme lues",
       })
     } catch (error) {
-      console.error("Error marking all notifications as read:", error)
+      console.error("Mark all as read failed:", error)
+
       // Revert optimistic update
       setNotifications((prev) =>
-        prev.map((n) => {
-          const wasUnread = notifications.find((orig) => orig._id === n._id && !orig.read)
-          return wasUnread ? { ...n, read: false } : n
-        }),
+          prev.map((n) => {
+            const originalNotification = notifications.find(orig => orig._id === n._id)
+            return originalNotification ? { ...n, read: originalNotification.read } : n
+          })
       )
       setUnreadCount(notifications.filter((n) => !n.read).length)
 
@@ -274,82 +318,67 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     }
   }, [notifications, toast])
 
-  const deleteNotification = useCallback(
-    async (notificationId: string) => {
-      try {
-        const notificationToDelete = notifications.find((n) => n._id === notificationId)
-        setNotificationToDelete(notificationToDelete)
+  const deleteNotification = useCallback(async (notificationId: string) => {
+    const toDelete = notifications.find((n) => n._id === notificationId)
 
-        // Optimistically update UI
-        setNotifications((prev) => prev.filter((n) => n._id !== notificationId))
-        if (notificationToDelete && !notificationToDelete.read) {
-          setUnreadCount((prev) => Math.max(0, prev - 1))
-        }
+    try {
+      // Optimistic update
+      setNotifications((prev) => prev.filter((n) => n._id !== notificationId))
+      if (toDelete && !toDelete.read) setUnreadCount((prev) => prev - 1)
 
-        // Make API call
-        const response = await fetch("/api/notifications/delete", {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ notificationId }),
-        })
+      const response = await fetch("/api/notifications/delete", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ notificationId }),
+      })
 
-        if (!response.ok) {
-          throw new Error("Failed to delete notification")
-        }
+      if (!response.ok) throw new Error(`Failed to delete notification: ${response.statusText}`)
 
-        toast({
-          title: "Succès",
-          description: "Notification supprimée",
-        })
-      } catch (error) {
-        console.error("Error deleting notification:", error)
-        // Revert optimistic update
-        if (notificationToDelete) {
-          setNotifications((prev) => [notificationToDelete, ...prev])
-          if (!notificationToDelete.read) {
-            setUnreadCount((prev) => prev + 1)
-          }
-        }
+      toast({ title: "Succès", description: "Notification supprimée" })
+    } catch (error) {
+      console.error("Delete notification failed:", error)
 
-        toast({
-          title: "Erreur",
-          description: "Impossible de supprimer la notification",
-          variant: "destructive",
-        })
+      // Revert optimistic update
+      if (toDelete) {
+        setNotifications((prev) => [toDelete, ...prev])
+        if (!toDelete.read) setUnreadCount((prev) => prev + 1)
       }
-    },
-    [notifications, toast],
-  )
 
-  // Connect to SSE when user is authenticated
-  useEffect(() => {
-    if (session?.user) {
-      connectToSSE()
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer la notification",
+        variant: "destructive",
+      })
     }
+  }, [notifications, toast])
+
+  // Initialize connection on mount
+  useEffect(() => {
+    isUnmountedRef.current = false
+    connectToSSE()
 
     // Cleanup on unmount
     return () => {
-      if (eventSource) {
-        eventSource.close()
-      }
-      if (retryTimeout) {
-        clearTimeout(retryTimeout)
-      }
+      isUnmountedRef.current = true
+      cleanupConnection()
     }
-  }, [session?.user])
+  }, [connectToSSE, cleanupConnection])
 
-  // Cleanup on session change
+  // Add visibility change handler to reconnect when tab becomes visible
   useEffect(() => {
-    if (!session?.user && eventSource) {
-      eventSource.close()
-      setEventSource(null)
-      setConnectionStatus("disconnected")
-      setNotifications([])
-      setUnreadCount(0)
+    const handleVisibilityChange = () => {
+      if (!document.hidden && connectionStatus === "disconnected") {
+        console.log("Tab became visible, attempting to reconnect...")
+        retryConnection()
+      }
     }
-  }, [session?.user, eventSource])
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange)
+  }, [connectionStatus, retryConnection])
 
   const value: NotificationContextType = {
     notifications,
