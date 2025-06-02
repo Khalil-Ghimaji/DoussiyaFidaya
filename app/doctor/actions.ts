@@ -394,7 +394,7 @@ export async function createPrescription(prescriptionData: any) {
 }
 
 // Medical Certificate actions
-export async function createMedicalCertificate(certificateData: any) {
+export async function createMedicalCertificate(_,certificateData: any) {
   try {
     const session = await auth()
     if (!session?.user?.id) {
@@ -580,7 +580,7 @@ export async function updateConsultation(id: string, patientId: string, values: 
           create: {
             date: new Date(),
             is_signed: false,
-            status: "pending",
+            status: "Pending",
             patients:{
               connect:{
                 id: patientId
@@ -593,7 +593,7 @@ export async function updateConsultation(id: string, patientId: string, values: 
         deleteMany: {}
       } : undefined
     }
-    console.log("update consultation data", data1)
+    console.log("update consultation data1", data1)
     const data2 = {
       prescriptions: values.prescriptions? {
         update: {
@@ -613,8 +613,8 @@ export async function updateConsultation(id: string, patientId: string, values: 
         }
       }:{},
       lab_requests: values.labRequests ? {
-        create: {
-          data: values.labRequests.map(request => ({
+        create: 
+          values.labRequests.map(request => ({
             type: request.type,
             priority: request.priority,
             description: request.description,
@@ -624,11 +624,12 @@ export async function updateConsultation(id: string, patientId: string, values: 
               }
             }
           }))
-        }
+        
       }:{}
     }
-    console.log("i arrived here")
-    const result = await sendGraphQLMutation<{ updateOneConsultations: { id: string } }>(
+    console.dir(data2,{depth:null})
+    console.log("i arrived here before the mutation")
+    const result = await sendGraphQLMutation<any>(
       UPDATE_CONSULTATION,
       {
         where: { id },

@@ -1,13 +1,46 @@
-"use client"
+import { Suspense } from "react";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
+import NewCertificateForm from "./certificate-form";
+import { fetchGraphQL } from "@/lib/graphql-client";
 
-import { Suspense } from "react"
-import { ArrowLeft, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import Link from "next/link"
-import { NewCertificateForm } from "./certificate-form"
+interface Patient {
+  id: string;
+  users: {
+    first_name: string;
+    last_name: string;
+    date_of_birth: string;
+  };
+}
 
-export default function NewMedicalCertificatePage() {
+async function fetchPatients() {
+  try {
+    const result = await fetchGraphQL(
+      `
+        query FindManyPatients {
+          findManyPatients {
+            id
+            date_of_birth
+            users {
+              first_name
+              last_name
+            }
+          }
+        }
+      `
+    );
+    return result.data.findManyPatients || [];  
+  } catch (error) {
+    console.error("Error fetching patients:", error);
+    return [];
+  }
+}
+
+export default async function NewMedicalCertificatePage() {
+  const patients: Patient[] = await fetchPatients();
+
   return (
     <div className="container py-8">
       <div className="mx-auto max-w-2xl">
@@ -33,12 +66,11 @@ export default function NewMedicalCertificatePage() {
                 </div>
               }
             >
-              <NewCertificateForm />
+              <NewCertificateForm patients={patients} />
             </Suspense>
           </CardContent>
         </Card>
       </div>
     </div>
-  )
+  );
 }
-
