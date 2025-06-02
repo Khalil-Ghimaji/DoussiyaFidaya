@@ -1,332 +1,461 @@
 "use client"
 
-import { useState } from "react"
-import { format } from "date-fns"
-import { fr } from "date-fns/locale"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import type React from "react"
+
+import { useState, useEffect, useRef } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { Search, Inbox, Send, Archive, Trash2, Mail, MailOpen, Reply } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Send, Paperclip, Search, MoreVertical, Trash2, RefreshCw, WifiOff, MessageSquare } from "lucide-react"
+import { useChat } from "@/hooks/use-chat"
+import { formatDistanceToNow } from "date-fns"
+import { fr } from "date-fns/locale"
+import { toast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
+import { NewMessageDialog } from "./new-message-dialog"
+import { useDoctorPatients } from "@/hooks/use-doctor-patients"
 
-type Message = {
-  _id: string
-  subject: string
-  content: string
-  date: string
-  isRead: boolean
-  sender: {
-    _id: string
-    name: string
-    role: string
-    profileImage: string
-  }
-  recipient: {
-    _id: string
-    name: string
-    role: string
-  }
-}
+export function MessagesList() {
+    const {
+        isConnected,
+        isConnecting,
+        conversations,
+        currentConversation,
+        messages,
+        typingUsers,
+        onlineUsers,
+        selectConversation,
+        sendMessage,
+        loadMoreMessages,
+        startTyping,
+        deleteMessage,
+        chatClient,
+    } = useChat()
 
-type MessagesListProps = {
-  initialMessages: Message[]
-}
+    const [messageInput, setMessageInput] = useState("")
+    const [searchTerm, setSearchTerm] = useState("")
+    const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+    const [isUploading, setIsUploading] = useState(false)
+    const messagesEndRef = useRef<HTMLDivElement>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
+    const { patients } = useDoctorPatients()
 
-export function MessagesList({ initialMessages }: MessagesListProps) {
-  const [messages, setMessages] = useState(initialMessages)
-  const [activeTab, setActiveTab] = useState("inbox")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null)
-  const [replyContent, setReplyContent] = useState("")
-  const [isReplying, setIsReplying] = useState(false)
-  const { toast } = useToast()
+    const currentConversationData = conversations.find((c) => c.id === currentConversation)
+    const currentMessages = currentConversation ? messages.get(currentConversation) : null
 
-  const inboxMessages = messages.filter((msg) => msg.recipient._id === "current-doctor-id")
-  const sentMessages = messages.filter((msg) => msg.sender._id === "current-doctor-id")
-  const archivedMessages: Message[] = [] // This would be populated from the server
+    const filteredConversations = conversations.filter((conv) => {
+        if (!searchTerm) return true
+        const doctorName = `${conv.partnerDoctor.first_name} ${conv.partnerDoctor.last_name}`.toLowerCase()
+        const patientName = conv.patient.name.toLowerCase()
+        return doctorName.includes(searchTerm.toLowerCase()) || patientName.includes(searchTerm.toLowerCase())
+    })
 
-  const filteredMessages = (messageList: Message[]) => {
-    if (!searchQuery) return messageList
-
-    return messageList.filter(
-      (msg) =>
-        msg.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        msg.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        msg.sender.name.toLowerCase().includes(searchQuery.toLowerCase()),
-    )
-  }
-
-  const formatMessageDate = (dateStr: string) => {
-    const date = new Date(dateStr)
-    const today = new Date()
-
-    if (date.toDateString() === today.toDateString()) {
-      return format(date, "HH:mm", { locale: fr })
-    } else {
-      return format(date, "d MMM", { locale: fr })
-    }
-  }
-
-  const handleMarkAsRead = (messageId: string) => {
-    setMessages((prev) => prev.map((msg) => (msg._id === messageId ? { ...msg, isRead: true } : msg)))
-  }
-
-  const handleOpenMessage = (message: Message) => {
-    setSelectedMessage(message)
-    if (!message.isRead) {
-      handleMarkAsRead(message._id)
-    }
-  }
-
-  const handleReply = async () => {
-    if (!replyContent.trim() || !selectedMessage) {
-      toast({
-        title: "Message vide",
-        description: "Veuillez saisir un message avant d'envoyer.",
-        variant: "destructive",
-      })
-      return
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
     }
 
-    setIsReplying(true)
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+    useEffect(() => {
+        scrollToBottom()
+    }, [currentMessages?.messages])
 
-      // Create a new message in the UI
-      const newMessage: Message = {
-        _id: `reply-${Date.now()}`,
-        subject: `Re: ${selectedMessage.subject}`,
-        content: replyContent,
-        date: new Date().toISOString(),
-        isRead: true,
-        sender: {
-          _id: "current-doctor-id",
-          name: "Dr. Current User",
-          role: "doctor",
-          profileImage: "/placeholder.svg?height=40&width=40",
-        },
-        recipient: {
-          _id: selectedMessage.sender._id,
-          name: selectedMessage.sender.name,
-          role: selectedMessage.sender.role,
-        },
-      }
+    const handleSendMessage = async () => {
+        if (!currentConversationData || (!messageInput.trim() && selectedFiles.length === 0)) return
 
-      setMessages((prev) => [newMessage, ...prev])
+        try {
+            setIsUploading(true)
+            let attachments = []
 
-      toast({
-        title: "Message envoyé",
-        description: "Votre réponse a été envoyée avec succès.",
-      })
+            if (selectedFiles.length > 0) {
+                attachments = await chatClient.uploadFiles(selectedFiles)
+            }
 
-      setReplyContent("")
-      setSelectedMessage(null)
-    } catch (error) {
-      toast({
-        title: "Erreur",
-        description: "Une erreur est survenue. Veuillez réessayer.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsReplying(false)
+            await sendMessage({
+                receiverId: currentConversationData.partnerDoctor.id,
+                patientId: currentConversationData.patient.id,
+                content: messageInput.trim(),
+                attachments,
+            })
+
+            setMessageInput("")
+            setSelectedFiles([])
+        } catch (error) {
+            console.error("Failed to send message:", error)
+            toast({
+                title: "Erreur",
+                description: "Impossible d'envoyer le message",
+                variant: "destructive",
+            })
+        } finally {
+            setIsUploading(false)
+        }
     }
-  }
 
-  const renderMessageItem = (message: Message) => (
-    <div
-      key={message._id}
-      className={`flex items-start space-x-4 p-3 rounded-md cursor-pointer transition-colors ${
-        message.isRead ? "bg-background hover:bg-muted/50" : "bg-muted/30 hover:bg-muted/50 font-medium"
-      }`}
-      onClick={() => handleOpenMessage(message)}
-    >
-      <Avatar className="h-10 w-10 mt-1">
-        <AvatarImage
-          src={message.sender.profileImage || "/placeholder.svg?height=40&width=40"}
-          alt={message.sender.name}
-        />
-        <AvatarFallback>
-          {message.sender.name
-            .split(" ")
-            .map((n) => n[0])
-            .join("")}
-        </AvatarFallback>
-      </Avatar>
-      <div className="flex-1 space-y-1 overflow-hidden">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium truncate">{message.sender.name}</p>
-          <span className="text-xs text-muted-foreground whitespace-nowrap">{formatMessageDate(message.date)}</span>
-        </div>
-        <p className="text-sm font-medium truncate">{message.subject}</p>
-        <p className="text-xs text-muted-foreground line-clamp-2">{message.content}</p>
-      </div>
-      {!message.isRead && <Badge variant="secondary" className="ml-2 h-2 w-2 rounded-full p-0" />}
-    </div>
-  )
+    const handleInputChange = (value: string) => {
+        setMessageInput(value)
+        if (currentConversationData && value.trim()) {
+            startTyping(currentConversationData.partnerDoctor.id, currentConversationData.patient.id)
+        }
+    }
 
-  return (
-    <>
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="relative">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher des messages..."
-              className="pl-8"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Tabs defaultValue="inbox" value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="inbox" className="flex gap-2">
-                <Inbox className="h-4 w-4" />
-                Réception
-                {inboxMessages.filter((m) => !m.isRead).length > 0 && (
-                  <Badge variant="secondary">{inboxMessages.filter((m) => !m.isRead).length}</Badge>
+    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(event.target.files || [])
+        if (selectedFiles.length + files.length > 5) {
+            toast({
+                title: "Limite atteinte",
+                description: "Vous ne pouvez sélectionner que 5 fichiers maximum",
+                variant: "destructive",
+            })
+            return
+        }
+
+        const validFiles = files.filter((file) => {
+            if (file.size > 10 * 1024 * 1024) {
+                toast({
+                    title: "Fichier trop volumineux",
+                    description: `${file.name} dépasse la limite de 10MB`,
+                    variant: "destructive",
+                })
+                return false
+            }
+            return true
+        })
+
+        setSelectedFiles((prev) => [...prev, ...validFiles])
+    }
+
+    const removeFile = (index: number) => {
+        setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
+    }
+
+    const handleDeleteMessage = (messageId: string) => {
+        if (!currentConversationData) return
+
+        if (confirm("Êtes-vous sûr de vouloir supprimer ce message ?")) {
+            deleteMessage(messageId, currentConversationData.patient.id, currentConversationData.partnerDoctor.id)
+        }
+    }
+
+    const getTypingIndicator = () => {
+        if (!currentConversationData) return null
+
+        const typingKey = `${currentConversationData.partnerDoctor.id}-${currentConversationData.patient.id}`
+        const typingList = typingUsers.get(typingKey) || []
+
+        if (typingList.length === 0) return null
+
+        return (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground p-2">
+                <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-primary rounded-full animate-bounce" />
+                    <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
+                    <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+                </div>
+                <span>{currentConversationData.partnerDoctor.first_name} est en train d'écrire...</span>
+            </div>
+        )
+    }
+
+    if (!isConnected && !isConnecting) {
+        return (
+            <Alert>
+                <WifiOff className="h-4 w-4" />
+                <AlertDescription>Connexion au système de messagerie en cours...</AlertDescription>
+            </Alert>
+        )
+    }
+
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
+            {/* Conversations List */}
+            <Card className="lg:col-span-1">
+                <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center gap-2">
+                            <MessageSquare className="h-5 w-5" />
+                            Conversations
+                            {conversations.length > 0 && <Badge variant="secondary">{conversations.length}</Badge>}
+                        </CardTitle>
+                        <div className="flex items-center gap-2">
+                            <div className={cn("w-2 h-2 rounded-full", isConnected ? "bg-green-500" : "bg-red-500")} />
+                            <Button variant="ghost" size="sm" onClick={() => window.location.reload()} disabled={isConnecting}>
+                                <RefreshCw className={cn("h-4 w-4", isConnecting && "animate-spin")} />
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Rechercher une conversation..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-10"
+                        />
+                    </div>
+                    <div className="mt-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => document.querySelector('[data-trigger="new-message"]')?.click()}
+                        >
+                            <MessageSquare className="h-4 w-4 mr-2" />
+                            Nouvelle conversation
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <ScrollArea className="h-[500px]">
+                        {filteredConversations.length === 0 ? (
+                            <div className="p-4 text-center text-muted-foreground">
+                                {isConnecting ? "Chargement..." : "Aucune conversation"}
+                            </div>
+                        ) : (
+                            filteredConversations.map((conversation) => {
+                                const isOnline = onlineUsers.has(conversation.partnerDoctor.id)
+                                const isActive = currentConversation === conversation.id
+
+                                return (
+                                    <div
+                                        key={conversation.id}
+                                        className={cn(
+                                            "p-4 border-b cursor-pointer hover:bg-muted/50 transition-colors",
+                                            isActive && "bg-muted",
+                                        )}
+                                        onClick={() => selectConversation(conversation.id)}
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <div className="relative">
+                                                <Avatar className="h-10 w-10">
+                                                    <AvatarImage src={conversation.partnerDoctor.profile_image || "/placeholder.svg"} />
+                                                    <AvatarFallback>
+                                                        {conversation.partnerDoctor.first_name[0]}
+                                                        {conversation.partnerDoctor.last_name[0]}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                {isOnline && (
+                                                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between">
+                                                    <p className="font-medium truncate">
+                                                        Dr. {conversation.partnerDoctor.first_name} {conversation.partnerDoctor.last_name}
+                                                    </p>
+                                                    {conversation.unreadCount > 0 && (
+                                                        <Badge variant="destructive" className="ml-2">
+                                                            {conversation.unreadCount}
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <p className="text-sm text-muted-foreground truncate">Patient: {conversation.patient.name}</p>
+                                                {conversation.lastMessage && (
+                                                    <p className="text-xs text-muted-foreground truncate mt-1">
+                                                        {conversation.lastMessage.content || "📎 Pièce jointe"}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            })
+                        )}
+                    </ScrollArea>
+                </CardContent>
+            </Card>
+
+            {/* Chat Area */}
+            <Card className="lg:col-span-2 flex flex-col">
+                {currentConversationData ? (
+                    <>
+                        {/* Chat Header */}
+                        <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <Avatar className="h-10 w-10">
+                                        <AvatarImage src={currentConversationData.partnerDoctor.profile_image || "/placeholder.svg"} />
+                                        <AvatarFallback>
+                                            {currentConversationData.partnerDoctor.first_name[0]}
+                                            {currentConversationData.partnerDoctor.last_name[0]}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                        <h3 className="font-semibold">
+                                            Dr. {currentConversationData.partnerDoctor.first_name}{" "}
+                                            {currentConversationData.partnerDoctor.last_name}
+                                        </h3>
+                                        <p className="text-sm text-muted-foreground">
+                                            Discussion sur: {currentConversationData.patient.name}
+                                        </p>
+                                        {onlineUsers.has(currentConversationData.partnerDoctor.id) && (
+                                            <div className="flex items-center gap-1 text-xs text-green-600">
+                                                <div className="w-2 h-2 bg-green-500 rounded-full" />
+                                                En ligne
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <Button variant="ghost" size="sm">
+                                    <MoreVertical className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </CardHeader>
+
+                        <Separator />
+
+                        {/* Messages */}
+                        <CardContent className="flex-1 p-0">
+                            <ScrollArea className="h-[400px] p-4">
+                                {currentMessages?.hasMore && (
+                                    <div className="text-center mb-4">
+                                        <Button variant="outline" size="sm" onClick={() => loadMoreMessages(currentConversation!)}>
+                                            Charger plus de messages
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {currentMessages?.messages.map((message) => {
+                                    const isOwn = message.senderId === chatClient.getCurrentUser()?.id
+                                    const time = formatDistanceToNow(new Date(message.createdAt), {
+                                        addSuffix: true,
+                                        locale: fr,
+                                    })
+
+                                    return (
+                                        <div key={message.id} className={cn("flex mb-4", isOwn ? "justify-end" : "justify-start")}>
+                                            <div
+                                                className={cn(
+                                                    "max-w-[70%] rounded-lg p-3 relative group",
+                                                    isOwn ? "bg-primary text-primary-foreground" : "bg-muted",
+                                                )}
+                                            >
+                                                <div className="whitespace-pre-wrap break-words">{message.content}</div>
+
+                                                {message.attachments && message.attachments.length > 0 && (
+                                                    <div className="mt-2 space-y-1">
+                                                        {message.attachments.map((attachment, index) => (
+                                                            <div key={index} className="flex items-center gap-2 text-sm">
+                                                                <Paperclip className="h-3 w-3" />
+                                                                <a
+                                                                    href={attachment.url}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="underline hover:no-underline"
+                                                                >
+                                                                    {attachment.filename}
+                                                                </a>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                <div className="flex items-center justify-between mt-2 text-xs opacity-70">
+                                                    <span>{time}</span>
+                                                    {isOwn && (
+                                                        <div className="flex items-center gap-1">
+                                                            {message.isRead ? "✓✓" : "✓"}
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="opacity-0 group-hover:opacity-100 h-6 w-6 p-0"
+                                                                onClick={() => handleDeleteMessage(message.id)}
+                                                            >
+                                                                <Trash2 className="h-3 w-3" />
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+
+                                {getTypingIndicator()}
+                                <div ref={messagesEndRef} />
+                            </ScrollArea>
+                        </CardContent>
+
+                        <Separator />
+
+                        {/* Message Input */}
+                        <CardContent className="p-4">
+                            {selectedFiles.length > 0 && (
+                                <div className="mb-3 space-y-2">
+                                    {selectedFiles.map((file, index) => (
+                                        <div key={index} className="flex items-center justify-between bg-muted p-2 rounded">
+                                            <div className="flex items-center gap-2">
+                                                <Paperclip className="h-4 w-4" />
+                                                <span className="text-sm">{file.name}</span>
+                                                <span className="text-xs text-muted-foreground">({(file.size / 1024).toFixed(1)} KB)</span>
+                                            </div>
+                                            <Button variant="ghost" size="sm" onClick={() => removeFile(index)}>
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className="flex items-end gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={isUploading}
+                                >
+                                    <Paperclip className="h-4 w-4" />
+                                </Button>
+
+                                <div className="flex-1">
+                                    <Textarea
+                                        placeholder="Tapez votre message..."
+                                        value={messageInput}
+                                        onChange={(e) => handleInputChange(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter" && !e.shiftKey) {
+                                                e.preventDefault()
+                                                handleSendMessage()
+                                            }
+                                        }}
+                                        className="min-h-[40px] max-h-[120px] resize-none"
+                                        disabled={isUploading}
+                                    />
+                                </div>
+
+                                <Button
+                                    onClick={handleSendMessage}
+                                    disabled={(!messageInput.trim() && selectedFiles.length === 0) || isUploading}
+                                >
+                                    <Send className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </CardContent>
+
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            multiple
+                            accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.zip,.rar"
+                            onChange={handleFileSelect}
+                            className="hidden"
+                        />
+                    </>
+                ) : (
+                    <CardContent className="flex-1 flex items-center justify-center">
+                        <div className="text-center text-muted-foreground">
+                            <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                            <h3 className="text-lg font-semibold mb-2">Sélectionnez une conversation</h3>
+                            <p>Choisissez une conversation pour commencer à échanger</p>
+                        </div>
+                    </CardContent>
                 )}
-              </TabsTrigger>
-              <TabsTrigger value="sent">
-                <Send className="h-4 w-4 mr-2" />
-                Envoyés
-              </TabsTrigger>
-              <TabsTrigger value="archived">
-                <Archive className="h-4 w-4 mr-2" />
-                Archivés
-              </TabsTrigger>
-              <TabsTrigger value="trash">
-                <Trash2 className="h-4 w-4 mr-2" />
-                Corbeille
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="inbox" className="p-4 border-t">
-              {filteredMessages(inboxMessages).length > 0 ? (
-                <div className="space-y-2">{filteredMessages(inboxMessages).map(renderMessageItem)}</div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Mail className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">
-                    {searchQuery
-                      ? "Aucun message ne correspond à votre recherche"
-                      : "Votre boîte de réception est vide"}
-                  </p>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="sent" className="p-4 border-t">
-              {filteredMessages(sentMessages).length > 0 ? (
-                <div className="space-y-2">{filteredMessages(sentMessages).map(renderMessageItem)}</div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Send className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">
-                    {searchQuery ? "Aucun message ne correspond à votre recherche" : "Aucun message envoyé"}
-                  </p>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="archived" className="p-4 border-t">
-              {filteredMessages(archivedMessages).length > 0 ? (
-                <div className="space-y-2">{filteredMessages(archivedMessages).map(renderMessageItem)}</div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Archive className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">
-                    {searchQuery ? "Aucun message ne correspond à votre recherche" : "Aucun message archivé"}
-                  </p>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="trash" className="p-4 border-t">
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Trash2 className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">La corbeille est vide</p>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-
-      {selectedMessage && (
-        <Dialog open={!!selectedMessage} onOpenChange={(open) => !open && setSelectedMessage(null)}>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>{selectedMessage.subject}</DialogTitle>
-              <DialogDescription className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-6 w-6">
-                    <AvatarImage
-                      src={selectedMessage.sender.profileImage || "/placeholder.svg?height=24&width=24"}
-                      alt={selectedMessage.sender.name}
-                    />
-                    <AvatarFallback className="text-xs">
-                      {selectedMessage.sender.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span>{selectedMessage.sender.name}</span>
-                </div>
-                <span className="text-sm text-muted-foreground">
-                  {format(new Date(selectedMessage.date), "d MMMM yyyy à HH:mm", { locale: fr })}
-                </span>
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="p-4 bg-muted/30 rounded-md whitespace-pre-line">{selectedMessage.content}</div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <MailOpen className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">{selectedMessage.isRead ? "Lu" : "Non lu"}</span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Reply className="h-4 w-4" />
-                <h3 className="font-medium">Répondre</h3>
-              </div>
-              <Textarea
-                placeholder="Écrivez votre réponse ici..."
-                value={replyContent}
-                onChange={(e) => setReplyContent(e.target.value)}
-                className="min-h-[100px]"
-              />
-            </div>
-
-            <DialogFooter className="flex justify-between">
-              <Button variant="outline" onClick={() => setSelectedMessage(null)}>
-                Fermer
-              </Button>
-              <Button onClick={handleReply} disabled={isReplying}>
-                {isReplying ? "Envoi en cours..." : "Envoyer la réponse"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-    </>
-  )
+            </Card>
+            <NewMessageDialog patients={patients} />
+        </div>
+    )
 }
-
