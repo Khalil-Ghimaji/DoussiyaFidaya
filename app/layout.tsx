@@ -65,11 +65,13 @@ export default async function RootLayout({
       <body className={inter.className}>
         <ApolloWrapper>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <div className="relative flex min-h-screen flex-col">
-            <Header />
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </div>
+          <NotificationProvider>
+            <div className="relative flex min-h-screen flex-col">
+              <Header />
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </div>
+          </NotificationProvider>
         </ThemeProvider>
         </ApolloWrapper>
       </body>
@@ -80,3 +82,4 @@ export default async function RootLayout({
 
 
 import './globals.css'
+import {NotificationProvider} from "@/components/notification-provider";
