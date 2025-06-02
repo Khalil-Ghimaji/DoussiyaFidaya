@@ -18,6 +18,7 @@ import { fetchGraphQL } from "@/lib/graphql-client"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { cookies } from "next/headers"
 
 const CREATE_RDV = `
   mutation CreateRdv($data: RdvsCreateInput!) {
@@ -104,7 +105,12 @@ export default function NewAppointmentPage() {
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [patients, setPatients] = useState<Patient[]>([])
-  const doctorId = "3665a171-9626-4ee1-a1dd-086a1e445c2d" // Replace with actual doctor ID from auth
+
+  //lezzm njbed cookie bel s7i7
+  //const cookieStore = await cookies()
+  //const doctorId = cookieStore.get("associateId")?.value;
+  const doctorId = "55bd8336-7e9f-4bcb-8767-3b5010097ec4"
+  console.log("**********************Doctor ID:******************** New Appointment Page", doctorId)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),

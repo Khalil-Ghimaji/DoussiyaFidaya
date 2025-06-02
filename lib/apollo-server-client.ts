@@ -6,7 +6,7 @@ let apolloClient: ApolloClient<any> | null = null;
 function createApolloClient() {
   return new ApolloClient({
     link: new HttpLink({
-      uri: 'http://localhost:4000/graphql',
+      uri: process.env.API_URL+"/graphql",
     }),
     cache: new InMemoryCache(),
     ssrMode: true,
