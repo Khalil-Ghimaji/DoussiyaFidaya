@@ -140,21 +140,59 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
           console.log("SSE message received:", event.data)
           const parsedData = JSON.parse(event.data)
 
-          // Handle your specific event format
+          // Handle your specific event format: entity.*.action
           if (parsedData.eventName && parsedData.entity) {
-            // Convert your server's format to notification format
-            if (parsedData.eventName.includes('users.') && parsedData.eventName.includes('.updated')) {
-              const newNotification: Notification = {
-                _id: parsedData.entity.id || Date.now().toString(),
-                type: "message",
-                content: `User ${parsedData.entity.first_name} ${parsedData.entity.last_name} has been updated`,
-                read: false,
-                createdAt: parsedData.entity.updated_at || new Date().toISOString(),
-                relatedPatient: {
-                  _ref: parsedData.entity.id,
-                  firstName: parsedData.entity.first_name,
-                  lastName: parsedData.entity.last_name
+            const eventPattern = /^(\w+)\.([^.]+)\.(\w+)$/
+            const match = parsedData.eventName.match(eventPattern)
+
+            if (match) {
+              const [, entityType, entityId, action] = match
+              const entity = parsedData.entity
+
+              // Create notification based on entity type and action
+              const getNotificationContent = (entityType: string, action: string, entity: any) => {
+                const entityName = entity.first_name && entity.last_name
+                    ? `${entity.first_name} ${entity.last_name}`
+                    : entity.name || entity.title || entityId
+
+                switch (action) {
+                  case 'created':
+                    return `New ${entityType.slice(0, -1)} "${entityName}" has been created`
+                  case 'updated':
+                    return `${entityType.slice(0, -1)} "${entityName}" has been updated`
+                  case 'deleted':
+                    return `${entityType.slice(0, -1)} "${entityName}" has been deleted`
+                  case 'scheduled':
+                    return `${entityType.slice(0, -1)} "${entityName}" has been scheduled`
+                  case 'cancelled':
+                    return `${entityType.slice(0, -1)} "${entityName}" has been cancelled`
+                  case 'completed':
+                    return `${entityType.slice(0, -1)} "${entityName}" has been completed`
+                  default:
+                    return `${entityType.slice(0, -1)} "${entityName}" - ${action}`
                 }
+              }
+
+              const getNotificationType = (entityType: string, action: string) => {
+                if (entityType === 'appointments') return 'appointment'
+                if (entityType === 'prescriptions') return 'prescription'
+                if (entityType === 'lab_results') return 'lab_result'
+                if (action === 'deleted' || action === 'cancelled') return 'emergency_access'
+                if (action === 'created' || action === 'completed') return 'access_granted'
+                return 'message'
+              }
+
+              const newNotification: Notification = {
+                _id: `${entityType}-${entityId}-${action}-${Date.now()}`,
+                type: getNotificationType(entityType, action),
+                content: getNotificationContent(entityType, action, entity),
+                read: false,
+                createdAt: entity.updated_at || entity.created_at || new Date().toISOString(),
+                relatedPatient: entity.first_name && entity.last_name ? {
+                  _ref: entity.id,
+                  firstName: entity.first_name,
+                  lastName: entity.last_name
+                } : undefined
               }
 
               setNotifications((prev) => {
@@ -166,6 +204,10 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
 
               setUnreadCount((prev) => prev + 1)
               showToastNotification(newNotification)
+
+              console.log(`Processed ${entityType}.${action} event for entity ${entityId}`)
+            } else {
+              console.log("Event name doesn't match entity.*.action pattern:", parsedData.eventName)
             }
           }
           // Handle standard notification format

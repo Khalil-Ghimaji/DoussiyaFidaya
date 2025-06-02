@@ -21,7 +21,7 @@ async function getDoctorConsultations() {
     if (!token) {
       throw new Error("No authentication token found")
     }
-    const userId = (await cookies()).get("userId")?.value || ""
+    const userId = (await cookies()).get("associatedId")?.value || ""
     console.log("this is the userId", userId)
 
     // Default to fetching consultations for the last 30 days
