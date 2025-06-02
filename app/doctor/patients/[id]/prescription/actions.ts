@@ -3,6 +3,7 @@
 import { revalidateTag } from "next/cache"
 import { redirect } from "next/navigation"
 import { sendGraphQLMutation } from "@/lib/graphql-client"
+import { cookies } from "next/headers"
 
 export async function createPrescription(patientId: string, formData: FormData,session: any) {
 const medications = []
@@ -119,12 +120,9 @@ const medications = []
   }
 }
 export async function createPrescriptionAction(patientId: string, formData: FormData) {
-  //TODO: Replace with actual session management
-  const session = {
-    user: {
-      id: "fc6d9c2c-6ec6-48c1-b762-fe35c2894b30", // Simulated logged-in doctor
-    },
-  }
+  const storedSession = await cookies();
+  const doctorId = storedSession.get("associatedId")?.value;
+  const session = { user: { id: doctorId } } 
 
   const result = await createPrescription(patientId, formData, session)
 

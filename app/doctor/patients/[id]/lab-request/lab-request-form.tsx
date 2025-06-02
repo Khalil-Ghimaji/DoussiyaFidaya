@@ -146,7 +146,7 @@ export function LabRequestForm({ patient, doctorId }: LabRequestFormProps) {
                 {patient.firstName} {patient.lastName}
               </h3>
               <p className="text-sm text-muted-foreground">
-                {patient.gender === "male" ? "Homme" : "Femme"}, {calculateAge(patient.dateOfBirth)} ans
+                {patient.gender === "Male" ? "Homme" : "Femme"}, {calculateAge(patient.dateOfBirth)} ans
               </p>
             </div>
           </div>
