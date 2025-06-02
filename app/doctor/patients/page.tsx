@@ -7,7 +7,6 @@ import { GET_DOCTOR_PATIENTS } from "@/lib/graphql/queriesV2/doctor"
 import { auth } from "@/lib/auth"
 import { PatientsFilters } from "./patients-filters"
 import { fetchGraphQL } from "@/lib/graphql-client"
-import { cookies } from "next/headers"
 
 interface UserResponse {
   first_name: string;
@@ -77,11 +76,9 @@ async function getDoctorPatients() {
     }
   */
 
-
+  //TODO: Replace with actual session management for docID
   try {
-    const storedSesion = await cookies();
-    const docID = storedSesion.get("associatedId")?.value;
-    //const docID = "fc6d9c2c-6ec6-48c1-b762-fe35c2894b30"
+    const docID = "fc6d9c2c-6ec6-48c1-b762-fe35c2894b30"
     const { data } = await fetchGraphQL<GraphQLResponse>(
       GET_DOCTOR_PATIENTS,
       { docId: docID, take: 10, skip: 0 }
