@@ -211,7 +211,10 @@ async function DoctorAppointmentsContent({
   // Temporary doctor ID for testing
   const cookieStore = await cookies()
   console.log("**********************Cookies:********************", cookieStore.getAll())
-  const tempDoctorId = "3665a171-9626-4ee1-a1dd-086a1e445c2d" // Replace with an actual doctor ID from your database
+  //const tempDoctorId = "3665a171-9626-4ee1-a1dd-086a1e445c2d" 
+  // Replace with an actual doctor ID from your database
+  const tempDoctorId = cookieStore.get("associatedId")?.value;
+  console.log("**********************Doctor ID:******************** Doctor Appointments Page", tempDoctorId)
 
   // Parse filters from search params
   const searchFilter = (searchParams.search as string) || ""
