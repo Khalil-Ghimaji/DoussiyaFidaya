@@ -7,45 +7,24 @@ import Link from "next/link"
 import { executeGraphQLServer } from "@/lib/graphql-server"
 import { GET_PATIENT_DETAILS } from "@/lib/graphql/doctor-queries"
 import { PrescriptionForm } from "./prescription-form"
+import { graphqlClient } from "@/lib/graphql/client"
+import { fetchGraphQL } from "@/lib/graphql-client"
+import { adaptToPatient, PatientExtended } from "@/lib/graphql/types/patient"
+import { GET_PATIENT_EXTENDED } from "@/lib/graphql/queriesV2/patient"
 
-// Define the patient type
-type Patient = {
-  _id: string
-  firstName: string
-  lastName: string
-  dateOfBirth: string
-  gender: string
-  bloodType: string
-  allergies: string[]
-  medications: string[]
-  profileImage: string
-}
 
-// Get patient details from the server
-async function getPatientDetails(id: string) {
+async function getPatientDetails(id: string): Promise<PatientExtended | null> {
   try {
-    const data = await executeGraphQLServer<{ patient: Patient }>(
-      GET_PATIENT_DETAILS,
-      { patientId: id },
-      {
-        cache: "no-store", // Use SSR for up-to-date data
-        tags: [`patient-${id}`],
-      },
-    )
-
-    return data.patient
+    const response = await fetchGraphQL<{ patient: any }>(GET_PATIENT_EXTENDED, { patientId: id })
+    return adaptToPatient(response.data)
   } catch (error) {
     console.error("Error fetching patient details:", error)
     return null
   }
 }
-
 export default async function PatientPrescriptionPage({ params }: { params: { id: string } }) {
   const patient = await getPatientDetails(params.id)
 
-  if (!patient) {
-    notFound()
-  }
 
   return (
     <div className="container py-8">

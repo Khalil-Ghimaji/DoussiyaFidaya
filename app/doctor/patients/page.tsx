@@ -3,12 +3,37 @@ import { Loader2, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { executeGraphQLServer } from "@/lib/graphql-server"
-import { GET_DOCTOR_PATIENTS } from "@/lib/graphql/doctor-queries"
+import { GET_DOCTOR_PATIENTS } from "@/lib/graphql/queriesV2/doctor"
 import { auth } from "@/lib/auth"
 import { PatientsFilters } from "./patients-filters"
+import { fetchGraphQL } from "@/lib/graphql-client"
 
-// Define patient type
-type Patient = {
+interface UserResponse {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  address: string;
+  profile_picture: string | null;
+}
+
+interface PatientResponse {
+  users: UserResponse;
+  date_of_birth: string;
+  gender: string;
+}
+
+interface ConsultationResponse {
+  date: string;
+  patient_id: string;
+  patients: PatientResponse;
+}
+
+interface GraphQLResponse {
+  docPatients: ConsultationResponse[];
+}
+
+interface Patient {
   _id: string
   firstName: string
   lastName: string
@@ -21,24 +46,45 @@ type Patient = {
   lastConsultation: string
 }
 
+const formatPatientData = (data: GraphQLResponse): Patient[] => {
+  return data.docPatients.map((consultation) => {
+    const user = consultation.patients.users;
+
+    return {
+      _id: consultation.patient_id,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      dateOfBirth: consultation.patients.date_of_birth,
+      gender: consultation.patients.gender,
+      email: user.email,
+      phone: user.phone ?? '',
+      address: user.address,
+      profileImage: user.profile_picture ?? '',
+      lastConsultation: consultation.date,
+    };
+  });
+};
+
+
 // Get patients from the server
 async function getDoctorPatients() {
+  /*
   try {
     const session = await auth()
     if (!session?.user?.id) {
       throw new Error("User not authenticated")
     }
+  */
 
-    const data = await executeGraphQLServer<{ doctorPatients: Patient[] }>(
+  //TODO: Replace with actual session management for docID
+  try {
+    const docID = "fc6d9c2c-6ec6-48c1-b762-fe35c2894b30"
+    const { data } = await fetchGraphQL<GraphQLResponse>(
       GET_DOCTOR_PATIENTS,
-      { doctorId: session.user.id },
-      {
-        revalidate: 300, // Use ISR with 5 minute revalidation
-        tags: ["patients"],
-      },
-    )
+      { docId: docID, take: 10, skip: 0 }
+    );
 
-    return data.doctorPatients
+    return formatPatientData(data);
   } catch (error) {
     console.error("Error fetching doctor patients:", error)
     return []

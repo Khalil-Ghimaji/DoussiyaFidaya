@@ -24,31 +24,12 @@ import {
   FilePlus,
   FileEdit,
 } from "lucide-react"
+import { PatientExtended } from "@/lib/graphql/types/patient"
 
-type Patient = {
-  _id: string
-  firstName: string
-  lastName: string
-  dateOfBirth: string
-  gender: string
-  email: string
-  phone: string
-  address: string
-  bloodType: string
-  allergies: string[]
-  medicalHistory: string
-  medications: string[]
-  emergencyContact: {
-    name: string
-    relationship: string
-    phone: string
-  }
-  profileImage: string
-  lastConsultation: string
-}
+
 
 type PatientDetailsProps = {
-  patient: Patient
+  patient: PatientExtended
 }
 
 export function PatientDetails({ patient }: PatientDetailsProps) {
@@ -151,19 +132,19 @@ export function PatientDetails({ patient }: PatientDetailsProps) {
 
             <div className="flex flex-col gap-2">
               <Button asChild>
-                <Link href={`/doctor/patients/${patient._id}/consultation`}>
+                <Link href={`/doctor/patients/${patient.id}/consultation`}>
                   <FileText className="mr-2 h-4 w-4" />
                   Nouvelle consultation
                 </Link>
               </Button>
               <Button variant="outline" asChild>
-                <Link href={`/doctor/patients/${patient._id}/prescription`}>
+                <Link href={`/doctor/patients/${patient.id}/prescription`}>
                   <Pill className="mr-2 h-4 w-4" />
                   Nouvelle ordonnance
                 </Link>
               </Button>
               <Button variant="outline" asChild>
-                <Link href={`/doctor/patients/${patient._id}/lab-request`}>
+                <Link href={`/doctor/patients/${patient.id}/lab-request`}>
                   <ClipboardList className="mr-2 h-4 w-4" />
                   Demande d'analyses
                 </Link>
@@ -208,7 +189,7 @@ export function PatientDetails({ patient }: PatientDetailsProps) {
             </CardContent>
             <CardFooter>
               <Button variant="outline" size="sm" asChild>
-                <Link href={`/doctor/patients/${patient._id}/history`}>
+                <Link href={`/doctor/patients/${patient.id}/history`}>
                   <FileEdit className="mr-2 h-4 w-4" />
                   Voir l'historique complet
                 </Link>
@@ -259,7 +240,7 @@ export function PatientDetails({ patient }: PatientDetailsProps) {
               </CardContent>
               <CardFooter>
                 <Button variant="outline" size="sm" asChild>
-                  <Link href={`/doctor/patients/${patient._id}/prescription`}>
+                  <Link href={`/doctor/patients/${patient.id}/prescription`}>
                     <FilePlus className="mr-2 h-4 w-4" />
                     Nouvelle ordonnance
                   </Link>
@@ -282,7 +263,7 @@ export function PatientDetails({ patient }: PatientDetailsProps) {
                   Consultez l'historique complet du patient pour voir toutes les consultations, ordonnances et analyses.
                 </p>
                 <Button className="mt-4" asChild>
-                  <Link href={`/doctor/patients/${patient._id}/history`}>Voir l'historique complet</Link>
+                  <Link href={`/doctor/patients/${patient.id}/history`}>Voir l'historique complet</Link>
                 </Button>
               </div>
             </CardContent>
@@ -301,10 +282,10 @@ export function PatientDetails({ patient }: PatientDetailsProps) {
                 <p className="text-muted-foreground">Consultez et gérez les ordonnances du patient.</p>
                 <div className="flex justify-center gap-2 mt-4">
                   <Button asChild>
-                    <Link href={`/doctor/patients/${patient._id}/prescription`}>Nouvelle ordonnance</Link>
+                    <Link href={`/doctor/patients/${patient.id}/prescription`}>Nouvelle ordonnance</Link>
                   </Button>
                   <Button variant="outline" asChild>
-                    <Link href={`/doctor/patients/${patient._id}/history`}>Voir les ordonnances</Link>
+                    <Link href={`/doctor/patients/${patient.id}/history`}>Voir les ordonnances</Link>
                   </Button>
                 </div>
               </div>
@@ -324,10 +305,10 @@ export function PatientDetails({ patient }: PatientDetailsProps) {
                 <p className="text-muted-foreground">Consultez et gérez les documents médicaux du patient.</p>
                 <div className="flex justify-center gap-2 mt-4">
                   <Button asChild>
-                    <Link href={`/doctor/patients/${patient._id}/lab-request`}>Demande d'analyses</Link>
+                    <Link href={`/doctor/patients/${patient.id}/lab-request`}>Demande d'analyses</Link>
                   </Button>
                   <Button variant="outline" asChild>
-                    <Link href={`/doctor/patients/${patient._id}/history`}>Voir les documents</Link>
+                    <Link href={`/doctor/patients/${patient.id}/history`}>Voir les documents</Link>
                   </Button>
                 </div>
               </div>

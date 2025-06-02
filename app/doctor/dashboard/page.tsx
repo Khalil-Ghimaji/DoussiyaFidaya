@@ -1,74 +1,67 @@
 import { Suspense } from "react"
 import { Loader2 } from "lucide-react"
-import { executeGraphQLServer } from "@/lib/graphql-server"
-import { GET_DOCTOR_DASHBOARD_DATA } from "@/lib/graphql/doctor-queries"
 import { auth } from "@/lib/auth"
 import { DashboardStats } from "./dashboard-stats"
 import { UpcomingAppointments } from "./upcoming-appointments"
 import { RecentConsultations } from "./recent-consultations"
+import { GET_DOCTOR_DASHBOARD } from "@/lib/graphql/queriesV2/doctor"
+import { executeGraphQLServer } from "@/lib/graphql-server"
+import { sendGraphQLMutation } from "@/lib/graphql-client"
 
-// Define dashboard data types
+// Define dashboard data types based on the new GraphQL structure
 type DashboardData = {
-  doctorStats: {
-    totalPatients: number
-    totalAppointments: number
-    totalConsultations: number
-    upcomingAppointments: number
-    pendingRequests: number
-  }
+  patientData: { patient_id: string }[]
+  totalAppointments: { _count: { _all: number } }
+  totalConsultations: { _count: { _all: number } }
+  upcomingAppointments: { _count: { _all: number } }
+  pendingRequests: { _count: { _all: number } }
   recentAppointments: {
-    _id: string
+    id: string
     date: string
     time: string
-    status: string
-    patient: {
-      _id: string
-      firstName: string
-      lastName: string
-      profileImage: string
+    patients: {
+      id: string
+      users: {
+        first_name: string
+        last_name: string
+        profile_picture: string | null
+      }
     }
   }[]
   recentConsultations: {
-    _id: string
+    id: string
     date: string
-    patient: {
-      _id: string
-      firstName: string
-      lastName: string
-      profileImage: string
+    notes: string[]
+    patients: {
+      id: string
+      users: {
+        first_name: string
+        last_name: string
+        profile_picture: string | null
+      }
     }
-    diagnosis: string
   }[]
 }
 
-// Get dashboard data from the server
 async function getDashboardData() {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      throw new Error("User not authenticated")
-    }
+    //todo: Replace with actual session management
+    const session = { user: { id: "fc6d9c2c-6ec6-48c1-b762-fe35c2894b30" } } // Replace with actual session
 
-    const data = await executeGraphQLServer<DashboardData>(
-      GET_DOCTOR_DASHBOARD_DATA,
-      { doctorId: session.user.id },
-      {
-        revalidate: 300, // Use ISR with 5 minute revalidation
-        tags: ["dashboard"],
-      },
+    const { data } = await sendGraphQLMutation<DashboardData>(
+      GET_DOCTOR_DASHBOARD,
+       { doctorId: session.user.id }
     )
 
     return data
   } catch (error) {
     console.error("Error fetching dashboard data:", error)
     return {
-      doctorStats: {
-        totalPatients: 0,
-        totalAppointments: 0,
-        totalConsultations: 0,
-        upcomingAppointments: 0,
-        pendingRequests: 0,
-      },
+      patientData: [],
+      totalAppointments: { _count: { _all: 0 } },
+      totalConsultations: { _count: { _all: 0 } },
+      upcomingAppointments: { _count: { _all: 0 } },
+      pendingRequests: { _count: { _all: 0 } },
       recentAppointments: [],
       recentConsultations: [],
     }
@@ -77,6 +70,45 @@ async function getDashboardData() {
 
 export default async function DashboardPage() {
   const dashboardData = await getDashboardData()
+
+  // Calculate unique patients count
+  const uniquePatientIds = new Set(dashboardData.patientData.map(p => p.patient_id))
+  const totalPatients = uniquePatientIds.size
+
+  // Transform data for components
+  const stats = {
+    totalPatients,
+    totalAppointments: dashboardData.totalAppointments._count._all,
+    totalConsultations: dashboardData.totalConsultations._count._all,
+    upcomingAppointments: dashboardData.upcomingAppointments._count._all,
+    pendingRequests: dashboardData.pendingRequests._count._all,
+  }
+
+  // Transform appointments data
+  const appointments = dashboardData.recentAppointments.map((apt) => ({
+    _id: apt.id,
+    date: apt.date,
+    time: apt.time,
+    patient: {
+      _id: apt.patients.id,
+      firstName: apt.patients.users.first_name,
+      lastName: apt.patients.users.last_name,
+      profileImage: apt.patients.users.profile_picture || null,
+    },
+  }))
+
+  // Transform consultations data
+  const consultations = dashboardData.recentConsultations.map((cons) => ({
+    _id: cons.id,
+    date: cons.date,
+    patient: {
+      _id: cons.patients.id,
+      firstName: cons.patients.users.first_name,
+      lastName: cons.patients.users.last_name,
+      profileImage: cons.patients.users.profile_picture || null,
+    },
+    diagnosis: cons.notes && cons.notes.length > 0 ? cons.notes[0] : "Consultation",
+  }))
 
   return (
     <div className="container py-8">
@@ -92,7 +124,7 @@ export default async function DashboardPage() {
           </div>
         }
       >
-        <DashboardStats stats={dashboardData.doctorStats} />
+        <DashboardStats stats={stats} />
       </Suspense>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
@@ -106,7 +138,7 @@ export default async function DashboardPage() {
             </div>
           }
         >
-          <UpcomingAppointments appointments={dashboardData.recentAppointments} />
+          <UpcomingAppointments appointments={appointments} />
         </Suspense>
 
         <Suspense
@@ -119,10 +151,9 @@ export default async function DashboardPage() {
             </div>
           }
         >
-          <RecentConsultations consultations={dashboardData.recentConsultations} />
+          <RecentConsultations consultations={consultations} />
         </Suspense>
       </div>
     </div>
   )
 }
-
