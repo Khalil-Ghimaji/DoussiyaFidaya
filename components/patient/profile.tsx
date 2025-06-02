@@ -53,7 +53,7 @@ export function PatientProfile({ patient }: PatientProfileProps) {
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <User className="h-4 w-4 text-muted-foreground" />
-            <span>{patient.gender === "male" ? "Homme" : patient.gender === "female" ? "Femme" : patient.gender}</span>
+            <span>{patient.gender === "Male" ? "Homme" : patient.gender === "female" ? "Femme" : patient.gender}</span>
           </div>
 
           <div className="flex items-center gap-2">

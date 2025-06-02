@@ -122,8 +122,8 @@ export function PatientsFilters({ initialPatients }: PatientsFiltersProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tous</SelectItem>
-                <SelectItem value="male">Homme</SelectItem>
-                <SelectItem value="female">Femme</SelectItem>
+                <SelectItem value="Male">Homme</SelectItem>
+                <SelectItem value="Female">Femme</SelectItem>
               </SelectContent>
             </Select>
             <Select value={sortBy} onValueChange={setSortBy}>
@@ -173,7 +173,7 @@ export function PatientsFilters({ initialPatients }: PatientsFiltersProps) {
                           {patient.firstName} {patient.lastName}
                         </h3>
                         <p className="text-sm text-muted-foreground mb-2">
-                          {patient.gender === "male" ? "Homme" : "Femme"}, {calculateAge(patient.dateOfBirth)} ans
+                          {patient.gender === "Male" ? "Homme" : "Femme"}, {calculateAge(patient.dateOfBirth)} ans
                         </p>
                         <Badge variant="outline" className="mb-4">
                           Dernière visite: {formatLastConsultation(patient.lastConsultation)}
@@ -256,7 +256,7 @@ export function PatientsFilters({ initialPatients }: PatientsFiltersProps) {
                         </div>
                       </div>
                       <div className="col-span-2">
-                        {calculateAge(patient.dateOfBirth)} ans / {patient.gender === "male" ? "H" : "F"}
+                        {calculateAge(patient.dateOfBirth)} ans / {patient.gender === "Male" ? "H" : "F"}
                       </div>
                       <div className="col-span-3">
                         <p>{patient.phone}</p>

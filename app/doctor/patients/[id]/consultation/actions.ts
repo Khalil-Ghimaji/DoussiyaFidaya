@@ -4,12 +4,14 @@ import { revalidateTag } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { sendGraphQLMutation } from '@/lib/graphql-client'
 import { createPrescription } from '../prescription/actions'
+import { cookies } from 'next/headers'
 
 export async function createConsultationAction(patientId: string, formData: FormData) {
   try {
     // Simulated logged-in doctor
-    //TODO: Replace with actual session management
-    const session = { user: { id: 'fc6d9c2c-6ec6-48c1-b762-fe35c2894b30' } }
+    const storedSession = await cookies();
+    const doctorId = storedSession.get("associatedId")?.value;
+    const session = { user: { id: doctorId } }
 
     // Extract all form data first
     const formValues = {
