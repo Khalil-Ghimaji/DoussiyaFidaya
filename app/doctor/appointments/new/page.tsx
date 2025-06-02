@@ -105,19 +105,40 @@ export default function NewAppointmentPage() {
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [patients, setPatients] = useState<Patient[]>([])
+  const [doctorId, setDoctorId] = useState<string>("")
 
-  //lezzm njbed cookie bel s7i7
-  //const cookieStore = await cookies()
-  //const doctorId = cookieStore.get("associateId")?.value;
-  const doctorId = "55bd8336-7e9f-4bcb-8767-3b5010097ec4"
-  console.log("**********************Doctor ID:******************** New Appointment Page", doctorId)
-
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-  })
-
-  // Fetch patients when component mounts
+  // Get doctorId from cookie when component mounts
   useEffect(() => {
+    const getCookie = (name: string) => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) {
+        const cookieValue = parts.pop()?.split(';').shift();
+        console.log(`Found ${name} cookie:`, cookieValue);
+        return cookieValue;
+      }
+      return null;
+    };
+
+    const id = getCookie('associatedId');
+    if (id) {
+      setDoctorId(id);
+      console.log("Doctor ID set from cookie:", id);
+    } else {
+      console.error("No associatedId cookie found");
+      toast({
+        title: "Erreur d'authentification",
+        description: "Session médecin non trouvée. Veuillez vous reconnecter.",
+        variant: "destructive",
+      });
+      router.push('/auth/login'); // Redirect to login if no doctor ID
+    }
+  }, [toast, router]);
+
+  // Fetch patients only if we have a doctorId
+  useEffect(() => {
+    if (!doctorId) return;
+
     fetchGraphQL<PatientsResponse>(GET_PATIENTS)
       .then(response => {
         if (response.data?.findManyPatients) {
@@ -132,11 +153,25 @@ export default function NewAppointmentPage() {
           variant: "destructive",
         })
       })
-  }, [toast])
+  }, [doctorId, toast])
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+  })
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!doctorId) {
+      toast({
+        title: "Erreur",
+        description: "Session médecin non trouvée. Veuillez vous reconnecter.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsSubmitting(true)
+      console.log("Creating appointment with doctor ID:", doctorId);
 
       const { data, errors } = await fetchGraphQL<CreateRdvResponse>(CREATE_RDV, {
         data: {
@@ -192,6 +227,9 @@ export default function NewAppointmentPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Nouveau rendez-vous</h1>
           <p className="text-muted-foreground">Créez un nouveau rendez-vous pour un patient</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            ID du médecin: {doctorId || 'Non connecté'}
+          </p>
         </div>
       </div>
 

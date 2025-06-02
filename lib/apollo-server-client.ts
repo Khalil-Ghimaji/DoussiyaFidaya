@@ -4,9 +4,12 @@ import { ApolloClient, InMemoryCache, HttpLink } from '@apollo/client';
 let apolloClient: ApolloClient<any> | null = null;
 
 function createApolloClient() {
+  // Get the base API URL from environment variable
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  
   return new ApolloClient({
     link: new HttpLink({
-      uri: process.env.API_URL+"/graphql",
+      uri: `${apiUrl}/graphql`,  // Properly construct the GraphQL endpoint
     }),
     cache: new InMemoryCache(),
     ssrMode: true,
