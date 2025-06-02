@@ -95,78 +95,84 @@ export const GET_ASSISTANT_DETAILS = `
 
 // Consultation queries
 export const GET_DOCTOR_CONSULTATIONS = `
-  query GetDoctorConsultations($doctorId: ID!, $startDate: String, $endDate: String) {
-    doctorConsultations(doctorId: $doctorId, startDate: $startDate, endDate: $endDate) {
-      _id
+  query findManyConsultations($where: ConsultationsWhereInput) {
+    findManyConsultations(
+      where: $where
+      orderBy: {
+        date: desc
+      }
+    ) {
+      id
       date
-      time
-      reason
-      diagnosis
-      hasPrescription
-      hasLabRequest
-      patient {
-        _id
-        firstName
-        lastName
-        dateOfBirth
+      notes
+      measures
+      prescriptions {
+        id
+      }
+      lab_requests {
+        id
+      }
+      patients {
+        id
+        users {
+          first_name
+          last_name
+        }
+        date_of_birth
         gender
-        profileImage
+        profile_image
       }
     }
   }
 `
 
 export const GET_CONSULTATION_DETAILS = `
-  query GetConsultationDetails($consultationId: ID!) {
-    consultation(id: $consultationId) {
-      _id
+  query findUniqueConsultations($where: ConsultationsWhereUniqueInput!) {
+    findUniqueConsultations(where: $where) {
+      id
       date
-      time
-      duration
-      reason
       notes
-      diagnosis
-      createdBy
-      createdAt
-      updatedAt
-      vitalSigns {
-        bloodPressure
-        heartRate
-        temperature
-        respiratoryRate
-        oxygenSaturation
-        weight
-      }
+      measures
       prescriptions {
-        _id
-        name
-        dosage
-        frequency
-        duration
-        quantity
+        id
+        date
+        instructions
+        is_signed
+        status
+        medications {
+          name
+          dosage
+          frequency
+          duration
+          quantity
+        }
       }
-      labRequests {
-        _id
+      lab_requests {
+        id
         type
         priority
-        laboratory
-        status
-        resultId
+        description
       }
-      patient {
-        _id
-        firstName
-        lastName
-        dateOfBirth
+      patients {
+        id
+        users {
+          first_name
+          last_name
+        }
+        date_of_birth
         gender
-        bloodType
-        profileImage
+        GeneralMedicalRecords_GeneralMedicalRecords_patient_idTopatients {
+          bloodType
+        }
+        profile_image
       }
-      doctor {
-        _id
-        firstName
-        lastName
-        speciality
+      doctors {
+        id
+        users {
+          first_name
+          last_name
+        }
+        specialty
       }
     }
   }

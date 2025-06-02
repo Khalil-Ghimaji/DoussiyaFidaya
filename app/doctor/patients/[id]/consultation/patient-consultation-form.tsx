@@ -1,117 +1,56 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
-import { z } from "zod"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
-import { FileText, Stethoscope, Activity } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { FileText, Stethoscope, Pill, FlaskConical, Plus, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { createConsultationAction } from "./actions"
+import { PatientExtended } from "@/lib/graphql/types/patient"
+import { useRouter } from 'next/navigation';
 
-type Patient = {
-  _id: string
-  firstName: string
-  lastName: string
-  dateOfBirth: string
-  gender: string
-  bloodType: string
-  allergies: string[]
-  medicalHistory: string
-  medications: string[]
-  profileImage: string
-}
 
 type PatientConsultationFormProps = {
-  patient: Patient
+  patient: PatientExtended
 }
 
-// Define the form schema
-const consultationFormSchema = z.object({
-  reason: z.string().min(3, "Le motif doit contenir au moins 3 caractères"),
-  symptoms: z.string().min(3, "Les symptômes doivent contenir au moins 3 caractères"),
-  examination: z.string().min(3, "L'examen doit contenir au moins 3 caractères"),
-  diagnosis: z.string().min(3, "Le diagnostic doit contenir au moins 3 caractères"),
-  treatment: z.string().min(3, "Le traitement doit contenir au moins 3 caractères"),
-  notes: z.string().optional(),
-  followUp: z.boolean().default(false),
-  followUpDate: z.string().optional(),
-  labTests: z.boolean().default(false),
-  prescription: z.boolean().default(false),
-})
-
-type ConsultationFormValues = z.infer<typeof consultationFormSchema>
+type Medication = {
+  name: string
+  dosage: string
+  frequency: string
+  duration: string
+  quantity: number
+}
 
 export function PatientConsultationForm({ patient }: PatientConsultationFormProps) {
-  const [activeTab, setActiveTab] = useState("consultation")
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState("patient-info")
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const router = useRouter()
+  const [priority, setPriority] = useState<"low" | "medium" | "high">("medium")
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    reason: '',
+    symptoms: '',
+    examination: '',
+    diagnosis: '',
+    treatment: '',
+    notes: '',
+    labRequestReason: '',
+    requestedTests: '',
+    labNotes: '',
+  });
+
+  const [medications, setMedications] = useState<Medication[]>([
+    { name: "", dosage: "", frequency: "", duration: "", quantity: 1 },
+  ])
   const { toast } = useToast()
-
-  // Initialize the form with default values
-  const form = useForm<ConsultationFormValues>({
-    resolver: zodResolver(consultationFormSchema),
-    defaultValues: {
-      reason: "",
-      symptoms: "",
-      examination: "",
-      diagnosis: "",
-      treatment: "",
-      notes: "",
-      followUp: false,
-      followUpDate: "",
-      labTests: false,
-      prescription: false,
-    },
-  })
-
-  // Handle form submission
-  const onSubmit = async (data: ConsultationFormValues) => {
-    setIsSubmitting(true)
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      console.log("Consultation data to submit:", data)
-
-      toast({
-        title: "Consultation enregistrée",
-        description: "La consultation a été enregistrée avec succès.",
-      })
-
-      // Handle follow-up actions
-      if (data.prescription) {
-        router.push(`/doctor/patients/${patient._id}/prescription`)
-        return
-      }
-
-      if (data.labTests) {
-        router.push(`/doctor/patients/${patient._id}/lab-request`)
-        return
-      }
-
-      // Redirect to patient profile
-      router.push(`/doctor/patients/${patient._id}`)
-    } catch (error) {
-      console.error("Error saving consultation:", error)
-      toast({
-        title: "Erreur",
-        description: "Une erreur est survenue lors de l'enregistrement de la consultation.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
 
   const calculateAge = (dateOfBirth: string) => {
     const today = new Date()
@@ -123,6 +62,78 @@ export function PatientConsultationForm({ patient }: PatientConsultationFormProp
     }
     return age
   }
+
+  const addMedication = () => {
+    setMedications([...medications, { name: "", dosage: "", frequency: "", duration: "", quantity: 1 }])
+  }
+
+  const removeMedication = (index: number) => {
+    if (medications.length > 1) {
+      setMedications(medications.filter((_, i) => i !== index))
+    }
+  }
+
+  const updateMedication = (index: number, field: keyof Medication, value: string | number) => {
+    const updated = medications.map((med, i) => (i === index ? { ...med, [field]: value } : med))
+    setMedications(updated)
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    try {
+      const formDataToSubmit = new FormData();
+      
+      // Add form data
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value) formDataToSubmit.append(key, value);
+      });
+      
+      // Add medications
+      medications.forEach((medication, index) => {
+        Object.entries(medication).forEach(([key, value]) => {
+          formDataToSubmit.append(`medications.${index}.${key}`, value.toString());
+        });
+      });
+
+      // Add priority
+      formDataToSubmit.append('priority', priority);
+
+      const result = await createConsultationAction(patient.id, formDataToSubmit);
+
+      if (result && !result.success) {
+        toast({
+          title: "Erreur",
+          description: result.message,
+          variant: "destructive",
+        })
+      } else {
+        router.push(`/doctor/patients/${patient.id}`)
+      }
+    } catch (error) {
+      console.error("Error submitting consultation:", error)
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de l'enregistrement de la consultation.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const tabs = [
+    { value: "patient-info", label: "Informations", icon: FileText },
+    { value: "consultation", label: "Consultation", icon: Stethoscope },
+    { value: "prescription", label: "Ordonnance", icon: Pill },
+    { value: "lab-request", label: "Analyses", icon: FlaskConical },
+  ]
 
   return (
     <div className="space-y-6">
@@ -151,278 +162,340 @@ export function PatientConsultationForm({ patient }: PatientConsultationFormProp
         </CardContent>
       </Card>
 
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
-          <Tabs defaultValue="consultation" value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="consultation">
-                <Stethoscope className="h-4 w-4 mr-2" />
-                Consultation
+      <form onSubmit={handleSubmit}>
+        <Tabs defaultValue="patient-info" value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-4">
+            {tabs.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value}>
+                <tab.icon className="h-4 w-4 mr-2" />
+                {tab.label}
               </TabsTrigger>
-              <TabsTrigger value="patient-info">
-                <FileText className="h-4 w-4 mr-2" />
-                Informations patient
-              </TabsTrigger>
-              <TabsTrigger value="follow-up">
-                <Activity className="h-4 w-4 mr-2" />
-                Suivi
-              </TabsTrigger>
-            </TabsList>
+            ))}
+          </TabsList>
 
-            <TabsContent value="consultation" className="mt-4 space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Détails de la consultation</CardTitle>
-                  <CardDescription>Informations sur la consultation actuelle</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="reason"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Motif de consultation</FormLabel>
-                        <FormControl>
-                          <Textarea placeholder="Motif de la visite du patient" className="min-h-[80px]" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+          {/* Patient Info Tab - Doesn't need form state as it's read-only */}
+          <TabsContent value="patient-info" className="mt-4 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Informations médicales</CardTitle>
+                <CardDescription>Informations médicales importantes du patient</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label>Groupe sanguin</Label>
+                  <p className="text-sm mt-1">{patient.bloodType || "Non renseigné"}</p>
+                </div>
 
-                  <FormField
-                    control={form.control}
-                    name="symptoms"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Symptômes</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Symptômes rapportés par le patient"
-                            className="min-h-[80px]"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="examination"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Examen clinique</FormLabel>
-                        <FormControl>
-                          <Textarea placeholder="Résultats de l'examen clinique" className="min-h-[100px]" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="diagnosis"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Diagnostic</FormLabel>
-                        <FormControl>
-                          <Textarea placeholder="Diagnostic établi" className="min-h-[80px]" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="treatment"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Traitement</FormLabel>
-                        <FormControl>
-                          <Textarea placeholder="Traitement recommandé" className="min-h-[80px]" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="notes"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Notes additionnelles</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Notes supplémentaires (optionnel)"
-                            className="min-h-[80px]"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="patient-info" className="mt-4 space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Informations médicales</CardTitle>
-                  <CardDescription>Informations médicales importantes du patient</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label>Groupe sanguin</Label>
-                    <p className="text-sm mt-1">{patient.bloodType || "Non renseigné"}</p>
-                  </div>
-
-                  <div>
-                    <Label>Allergies</Label>
-                    {patient.allergies && patient.allergies.length > 0 ? (
-                      <ul className="mt-1 space-y-1">
-                        {patient.allergies.map((allergy, index) => (
-                          <li key={index} className="text-sm flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-destructive" />
-                            {allergy}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm mt-1">Aucune allergie connue</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label>Médicaments actuels</Label>
-                    {patient.medications && patient.medications.length > 0 ? (
-                      <ul className="mt-1 space-y-1">
-                        {patient.medications.map((medication, index) => (
-                          <li key={index} className="text-sm flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-primary" />
-                            {medication}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm mt-1">Aucun médicament en cours</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label>Antécédents médicaux</Label>
-                    <p className="text-sm mt-1 whitespace-pre-line">
-                      {patient.medicalHistory || "Aucun antécédent médical renseigné"}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="follow-up" className="mt-4 space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Suivi et actions</CardTitle>
-                  <CardDescription>Définir les actions de suivi pour ce patient</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="followUp"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                        <FormControl>
-                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>Programmer un rendez-vous de suivi</FormLabel>
-                          <FormDescription>Cochez cette case si le patient doit revenir pour un suivi</FormDescription>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-
-                  {form.watch("followUp") && (
-                    <FormField
-                      control={form.control}
-                      name="followUpDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Date de suivi</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                <div>
+                  <Label>Allergies</Label>
+                  {patient.allergies && patient.allergies.length > 0 ? (
+                    <ul className="mt-1 space-y-1">
+                      {patient.allergies.map((allergy, index) => (
+                        <li key={index} className="text-sm flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-destructive" />
+                          {allergy}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm mt-1">Aucune allergie connue</p>
                   )}
+                </div>
 
-                  <Separator />
+                <div>
+                  <Label>Médicaments actuels</Label>
+                  {patient.medications && patient.medications.length > 0 ? (
+                    <ul className="mt-1 space-y-1">
+                      {patient.medications.map((medication, index) => (
+                        <li key={index} className="text-sm flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-primary" />
+                          {medication}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm mt-1">Aucun médicament en cours</p>
+                  )}
+                </div>
 
-                  <FormField
-                    control={form.control}
-                    name="prescription"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                        <FormControl>
-                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>Créer une ordonnance</FormLabel>
-                          <FormDescription>
-                            Cochez cette case pour créer une ordonnance après l'enregistrement de la consultation
-                          </FormDescription>
-                        </div>
-                      </FormItem>
-                    )}
+                <div>
+                  <Label>Antécédents médicaux</Label>
+                  <p className="text-sm mt-1 whitespace-pre-line">
+                    {patient.medicalHistory || "Aucun antécédent médical renseigné"}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Consultation Tab */}
+          <TabsContent value="consultation" className="mt-4 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Détails de la consultation</CardTitle>
+                <CardDescription>Informations sur la consultation actuelle</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="reason">Motif de consultation *</Label>
+                  <Textarea
+                    id="reason"
+                    name="reason"
+                    value={formData.reason}
+                    onChange={handleInputChange}
+                    placeholder="Motif de la visite du patient"
+                    className="min-h-[80px]"
+                    required
                   />
+                </div>
 
-                  <FormField
-                    control={form.control}
-                    name="labTests"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                        <FormControl>
-                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>Demander des analyses</FormLabel>
-                          <FormDescription>
-                            Cochez cette case pour créer une demande d'analyses après l'enregistrement de la
-                            consultation
-                          </FormDescription>
-                        </div>
-                      </FormItem>
-                    )}
+                <div>
+                  <Label htmlFor="symptoms">Symptômes *</Label>
+                  <Textarea
+                    id="symptoms"
+                    name="symptoms"
+                    value={formData.symptoms}
+                    onChange={handleInputChange}
+                    placeholder="Symptômes rapportés par le patient"
+                    className="min-h-[80px]"
+                    required
                   />
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+                </div>
 
-          <div className="flex justify-end gap-2 mt-6">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.push(`/doctor/patients/${patient._id}`)}
-              disabled={isSubmitting}
-            >
-              Annuler
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Enregistrement..." : "Enregistrer la consultation"}
-            </Button>
-          </div>
-        </form>
-      </Form>
+                <div>
+                  <Label htmlFor="examination">Examen clinique *</Label>
+                  <Textarea
+                    id="examination"
+                    name="examination"
+                    value={formData.examination}
+                    onChange={handleInputChange}
+                    placeholder="Résultats de l'examen clinique"
+                    className="min-h-[100px]"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="diagnosis">Diagnostic *</Label>
+                  <Textarea
+                    id="diagnosis"
+                    name="diagnosis"
+                    value={formData.diagnosis}
+                    onChange={handleInputChange}
+                    placeholder="Diagnostic établi"
+                    className="min-h-[80px]"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="treatment">Traitement *</Label>
+                  <Textarea
+                    id="treatment"
+                    name="treatment"
+                    value={formData.treatment}
+                    onChange={handleInputChange}
+                    placeholder="Traitement recommandé"
+                    className="min-h-[80px]"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="notes">Notes additionnelles</Label>
+                  <Textarea
+                    id="notes"
+                    name="notes"
+                    value={formData.notes}
+                    onChange={handleInputChange}
+                    placeholder="Notes supplémentaires (optionnel)"
+                    className="min-h-[80px]"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Prescription Tab */}
+          <TabsContent value="prescription" className="mt-4 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Ordonnance</CardTitle>
+                <CardDescription>Médicaments à prescrire (optionnel)</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {medications.map((medication, index) => (
+                  <div key={index} className="border rounded-lg p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium">Médicament {index + 1}</h4>
+                      {medications.length > 1 && (
+                        <Button type="button" variant="outline" size="sm" onClick={() => removeMedication(index)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label>Nom du médicament</Label>
+                        <Input
+                          value={medication.name}
+                          onChange={(e) => updateMedication(index, "name", e.target.value)}
+                          placeholder="Nom du médicament"
+                        />
+                      </div>
+
+                      <div>
+                        <Label>Dosage</Label>
+                        <Input
+                          value={medication.dosage}
+                          onChange={(e) => updateMedication(index, "dosage", e.target.value)}
+                          placeholder="ex: 500mg"
+                        />
+                      </div>
+
+                      <div>
+                        <Label>Quantité</Label>
+                        <Input
+                          type="number"
+                          value={medication.quantity}
+                          onChange={(e) => updateMedication(index, "quantity", Number.parseFloat(e.target.value) || 1)}
+                          placeholder="1"
+                          min="1"
+                          step="0.5"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label>Fréquence</Label>
+                        <Select
+                          value={medication.frequency}
+                          onValueChange={(value) => updateMedication(index, "frequency", value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner la fréquence" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1 fois par jour">1 fois par jour</SelectItem>
+                            <SelectItem value="2 fois par jour">2 fois par jour</SelectItem>
+                            <SelectItem value="3 fois par jour">3 fois par jour</SelectItem>
+                            <SelectItem value="4 fois par jour">4 fois par jour</SelectItem>
+                            <SelectItem value="Toutes les 4 heures">Toutes les 4 heures</SelectItem>
+                            <SelectItem value="Toutes les 6 heures">Toutes les 6 heures</SelectItem>
+                            <SelectItem value="Toutes les 8 heures">Toutes les 8 heures</SelectItem>
+                            <SelectItem value="Toutes les 12 heures">Toutes les 12 heures</SelectItem>
+                            <SelectItem value="Au besoin">Au besoin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label>Durée</Label>
+                        <Select
+                          value={medication.duration}
+                          onValueChange={(value) => updateMedication(index, "duration", value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner la durée" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="3 jours">3 jours</SelectItem>
+                            <SelectItem value="5 jours">5 jours</SelectItem>
+                            <SelectItem value="7 jours">7 jours</SelectItem>
+                            <SelectItem value="10 jours">10 jours</SelectItem>
+                            <SelectItem value="14 jours">14 jours</SelectItem>
+                            <SelectItem value="21 jours">21 jours</SelectItem>
+                            <SelectItem value="1 mois">1 mois</SelectItem>
+                            <SelectItem value="2 mois">2 mois</SelectItem>
+                            <SelectItem value="3 mois">3 mois</SelectItem>
+                            <SelectItem value="Jusqu'à amélioration">Jusqu'à amélioration</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <Button type="button" variant="outline" onClick={addMedication} className="w-full">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ajouter un médicament
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Lab Request Tab */}
+          <TabsContent value="lab-request" className="mt-4 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Demande d'analyses</CardTitle>
+                <CardDescription>Analyses de laboratoire à demander (optionnel)</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="labRequestReason">Motif de la demande</Label>
+                  <Textarea
+                    id="labRequestReason"
+                    name="labRequestReason"
+                    value={formData.labRequestReason}
+                    onChange={handleInputChange}
+                    placeholder="Motif de la demande d'analyses"
+                    className="min-h-[80px]"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="requestedTests">Analyses demandées</Label>
+                  <Textarea
+                    id="requestedTests"
+                    name="requestedTests"
+                    value={formData.requestedTests}
+                    onChange={handleInputChange}
+                    placeholder="Liste des analyses à effectuer"
+                    className="min-h-[100px]"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="priority">Priorité</Label>
+                  <Select value={priority} onValueChange={(value: "low" | "medium" | "high") => setPriority(value)}>
+                    <SelectTrigger id="priority">
+                      <SelectValue placeholder="Sélectionner une priorité" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Basse</SelectItem>
+                      <SelectItem value="medium">Moyenne</SelectItem>
+                      <SelectItem value="high">Haute</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="labNotes">Notes pour le laboratoire</Label>
+                  <Textarea
+                    id="labNotes"
+                    name="labNotes"
+                    value={formData.labNotes}
+                    onChange={handleInputChange}
+                    placeholder="Instructions spéciales pour le laboratoire (optionnel)"
+                    className="min-h-[80px]"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        <div className="flex justify-end gap-2 mt-6">
+          <Button type="button" variant="outline" disabled={isSubmitting}>
+            Annuler
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Enregistrement..." : "Enregistrer la consultation"}
+          </Button>
+        </div>
+      </form>
     </div>
   )
 }
-

@@ -22,3 +22,22 @@ export async function fetchGraphQL<T>(
     throw error;
   }
 }
+export async function sendGraphQLMutation<T>(
+  mutation: string | DocumentNode,
+  variables?: Record<string, any>
+): Promise<{ data: T }> {
+  const client = getApolloServerClient();
+
+  try {
+    const parsedMutation = typeof mutation === 'string' ? gql`${mutation}` : mutation;
+    const result = await client.mutate<T>({
+      mutation: parsedMutation,
+      variables,
+    });
+
+    return { data: result.data as T };
+  } catch (error) {
+    console.error('GraphQL Mutation Error:', error);
+    throw error;
+  }
+}

@@ -9,73 +9,28 @@ import { PatientProfile } from "@/components/patient/profile"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import { EditConsultationForm } from "./edit-form"
+import { BackendConsultationDetails, FrontendConsultationDetails, transformConsultationDetails } from "@/lib/transformers/consultation-details"
 
 // Define the consultation type
-type Consultation = {
-  _id: string
-  date: string
-  time: string
-  duration: number
-  reason: string
-  notes: string
-  diagnosis: string
-  createdBy: string
-  createdAt: string
-  updatedAt: string
-  vitalSigns: {
-    bloodPressure: string
-    heartRate: string
-    temperature: string
-    respiratoryRate: string
-    oxygenSaturation: string
-    weight: string
-  }
-  prescriptions: {
-    _id: string
-    name: string
-    dosage: string
-    frequency: string
-    duration: string
-    quantity: string
-  }[]
-  labRequests: {
-    _id: string
-    type: string
-    priority: string
-    laboratory: string
-    status: string
-    resultId: string
-  }[]
-  patient: {
-    _id: string
-    firstName: string
-    lastName: string
-    dateOfBirth: string
-    gender: string
-    bloodType: string
-    profileImage: string
-  }
-  doctor: {
-    _id: string
-    firstName: string
-    lastName: string
-    speciality: string
-  }
-}
+export type Consultation = FrontendConsultationDetails
 
 // Get consultation details from the server
 async function getConsultationDetails(id: string) {
   try {
-    const data = await executeGraphQLServer<{ consultation: Consultation }>(
+    const data = await executeGraphQLServer<{ findUniqueConsultations: BackendConsultationDetails }>(
       GET_CONSULTATION_DETAILS,
-      { consultationId: id },
+      {
+        where: {
+          id: id
+        }
+      },
       {
         cache: "no-store", // Use SSR for up-to-date data
         tags: [`consultation-${id}`],
       },
     )
 
-    return data.consultation
+    return data.findUniqueConsultations ? transformConsultationDetails(data.findUniqueConsultations) : null
   } catch (error) {
     console.error("Error fetching consultation details:", error)
     return null

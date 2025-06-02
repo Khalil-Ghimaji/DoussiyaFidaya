@@ -3,6 +3,7 @@
 import { revalidateTag } from "next/cache"
 import { executeGraphQLServer } from "@/lib/graphql-server"
 import { auth } from "@/lib/auth"
+import { sendGraphQLMutation } from "@/lib/graphql-client"
 
 // Appointment actions
 export async function declineAppointmentRequest(
@@ -393,7 +394,7 @@ export async function createPrescription(prescriptionData: any) {
 }
 
 // Medical Certificate actions
-export async function createMedicalCertificate(certificateData: any) {
+export async function createMedicalCertificate(_,certificateData: any) {
   try {
     const session = await auth()
     if (!session?.user?.id) {
@@ -410,7 +411,7 @@ export async function createMedicalCertificate(certificateData: any) {
       }
     `
 
-    const result = await executeGraphQLServer(
+    const result = await executeGraphQLServer<{ createMedicalCertificate: { _id: string; success: boolean; message?: string } }>(
       mutation,
       {
         input: {
@@ -480,3 +481,168 @@ export async function searchPatients(searchTerm: string) {
   }
 }
 
+export async function createAppointment(data: any) {
+  try {
+    interface CreateAppointmentResponse {
+      createOneRdvs: {
+        id: string;
+      };
+    }
+
+    const result = await sendGraphQLMutation<CreateAppointmentResponse>(
+      `mutation CreateAppointment($data: RdvsCreateInput!) {
+        createOneRdvs(data: $data) {
+          id
+        }
+      }`,
+      { data }
+    )
+
+    return { success: true, appointmentId: result.data.createOneRdvs.id }
+  } catch (error) {
+    console.error("Error creating appointment:", error)
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "An error occurred",
+    }
+  }
+}
+
+const UPDATE_CONSULTATION = `
+  mutation UpdateConsutation($data1: ConsultationsUpdateInput!,$data2: ConsultationsUpdateInput!, $where: ConsultationsWhereUniqueInput!) {
+  updateOneToOne:updateOneConsultations(where: $where, data: $data1) {
+    id
+  }
+  updateOneToMany:updateOneConsultations(where:$where,data:$data2){
+    id
+  }
+}
+`
+
+export async function updateConsultation(id: string, patientId: string, values: {
+  reason: string
+  notes?: string
+  diagnosis: string
+  vitalSigns: {
+    bloodPressure?: string
+    heartRate?: string
+    temperature?: string
+    respiratoryRate?: string
+    oxygenSaturation?: string
+    weight?: string
+  }
+  prescriptions?: {
+    _id?: string
+    name: string
+    dosage: string
+    frequency: string
+    duration: string
+    quantity: string
+  }[]
+  labRequests?: {
+    _id?: string
+    type: string
+    priority: string
+    description: string
+    laboratory?: string
+    status?: string
+    resultId?: string
+  }[]
+}) {
+  console.log("i arrived here in the action")
+  try {
+    console.log("i arrived there in the action")
+    // Transform frontend values to backend format
+    const data1 = {
+      notes: {
+        set: [values.reason, ...(values.notes?.split('\n').filter(note => note.trim()) || [] )]
+      },
+      measures: {
+        set: {
+          diagnosis: values.diagnosis,
+          vital_signs: {
+            blood_pressure: values.vitalSigns.bloodPressure,
+            heart_rate: values.vitalSigns.heartRate,
+            temperature: values.vitalSigns.temperature,
+            respiratory_rate: values.vitalSigns.respiratoryRate,
+            oxygen_saturation: values.vitalSigns.oxygenSaturation,
+            weight: values.vitalSigns.weight
+          }
+        }
+      },
+      prescriptions: values.prescriptions ? {
+        upsert:{
+          update: {
+            medications: {
+              deleteMany: {}
+            }
+          },
+          create: {
+            date: new Date(),
+            is_signed: false,
+            status: "Pending",
+            patients:{
+              connect:{
+                id: patientId
+              }
+            }
+          }
+        }
+      } : undefined,
+      lab_requests: values.labRequests ? {
+        deleteMany: {}
+      } : undefined
+    }
+    console.log("update consultation data1", data1)
+    const data2 = {
+      prescriptions: values.prescriptions? {
+        update: {
+          data: {
+            medications: {
+              createMany: {
+                data:  values.prescriptions.map(medication => ({
+                  name: medication.name,
+                  dosage: medication.dosage,
+                  frequency: medication.frequency,
+                  duration: medication.duration,
+                  quantity: medication.quantity
+                }))
+              }
+            }
+          }
+        }
+      }:{},
+      lab_requests: values.labRequests ? {
+        create: 
+          values.labRequests.map(request => ({
+            type: request.type,
+            priority: request.priority,
+            description: request.description,
+            patients:{
+              connect:{
+                id: patientId
+              }
+            }
+          }))
+        
+      }:{}
+    }
+    console.dir(data2,{depth:null})
+    console.log("i arrived here before the mutation")
+    const result = await sendGraphQLMutation<any>(
+      UPDATE_CONSULTATION,
+      {
+        where: { id },
+        data1,
+        data2
+      }
+    )
+    console.log("this is the result", result)
+
+    return { success: true }
+  } catch (error) {
+    console.log("i arrived here in the catch")
+    console.error("Error updating consultation:", error)
+    return { success: false, message: error instanceof Error ? error.message : "Une erreur est survenue" }
+  }
+}

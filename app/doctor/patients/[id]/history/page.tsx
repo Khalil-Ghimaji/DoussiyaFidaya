@@ -3,37 +3,28 @@ import { notFound } from "next/navigation"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { executeGraphQLServer } from "@/lib/graphql-server"
-import { GET_PATIENT_DETAILS, GET_PATIENT_HISTORY } from "@/lib/graphql/doctor-queries"
+import { GET_PATIENT_INFO, GET_PATIENT_HISTORY } from "@/lib/graphql/queriesV2/patient"
 import { PatientHistoryTabs } from "./patient-history-tabs"
+import { adaptToPatient, Patient, PatientHistory } from "@/lib/graphql/types/patient"
+import { fetchGraphQL } from "@/lib/graphql-client"
 
-// Define the patient type
-type Patient = {
-  _id: string
-  firstName: string
-  lastName: string
-  dateOfBirth: string
-  gender: string
-  profileImage: string
-}
-
-// Define the patient history type
-type PatientHistory = {
-  patientConsultations: {
-    _id: string
+// Raw data shape returned by GET_PATIENT_HISTORY
+type RawData = {
+  consultations?: Array<{
+    id: string
     date: string
-    time: string
-    reason: string
-    diagnosis: string
-    doctor: {
-      _id: string
-      firstName: string
-      lastName: string
-      speciality: string
+    notes: string[] | null
+    doctors: {
+      id: string
+      users: {
+        first_name: string
+        last_name: string
+      }
+      specialty: string
     }
-  }[]
-  patientPrescriptions: {
-    _id: string
+  }>
+  prescriptions?: Array<{
+    id: string
     date: string
     medications: {
       name: string
@@ -41,52 +32,86 @@ type PatientHistory = {
       frequency: string
       duration: string
     }[]
-    doctor: {
-      firstName: string
-      lastName: string
+    doctors: {
+      users: {
+        first_name: string
+        last_name: string
+      }
     }
-  }[]
-  patientLabResults: {
-    _id: string
+  }>
+  labResults?: Array<{
+    id: string
     date: string
-    type: string
+    type: {
+      name: string
+    }
     status: string
-    resultSummary: string
-  }[]
+    resultSummary: string | null
+  }>
 }
 
-// Get patient details from the server
-async function getPatientDetails(id: string) {
-  try {
-    const data = await executeGraphQLServer<{ patient: Patient }>(
-      GET_PATIENT_DETAILS,
-      { patientId: id },
-      {
-        revalidate: 60, // Use ISR with 1 minute revalidation
-        tags: [`patient-${id}`],
-      },
-    )
+function adaptToPatientHistory(data?: RawData): PatientHistory {
+  return {
+    patientLabResults: data?.labResults?.map(lab => ({
+      id: lab.id,
+      date: lab.date,
+      type: lab.type?.name ?? "",
+      status: lab.status,
+      resultSummary: lab.resultSummary ?? "",
+    })) ?? [],
 
-    return data.patient
+    patientPrescriptions: data?.prescriptions?.map(prescription => ({
+      id: prescription.id,
+      date: prescription.date,
+      medications: prescription.medications,
+      doctor: {
+        firstName: prescription.doctors?.users?.first_name ?? "",
+        lastName: prescription.doctors?.users?.last_name ?? "",
+      },
+    })) ?? [],
+
+    patientConsultations: data?.consultations?.map(consultation => ({
+      id: consultation.id,
+      date: consultation.date,
+      notes: Array.isArray(consultation.notes)
+        ? consultation.notes.join("\n")
+        : consultation.notes ?? "",
+      doctor: {
+        id: consultation.doctors?.id ?? "",
+        firstName: consultation.doctors?.users?.first_name ?? "",
+        lastName: consultation.doctors?.users?.last_name ?? "",
+        speciality: consultation.doctors?.specialty ?? "",
+      },
+    })) ?? [],
+  }
+}
+
+
+
+async function getPatientDetails(id: string): Promise<Patient | null> {
+  try {
+    const response = await fetchGraphQL<{ patient: any }>(GET_PATIENT_INFO, { patientId: id })
+    return adaptToPatient(response.data)
   } catch (error) {
     console.error("Error fetching patient details:", error)
     return null
   }
 }
 
-// Get patient history from the server
-async function getPatientHistory(id: string) {
+async function getPatientHistory(id: string): Promise<PatientHistory> {
   try {
-    const data = await executeGraphQLServer<PatientHistory>(
-      GET_PATIENT_HISTORY,
-      { patientId: id },
-      {
-        revalidate: 60, // Use ISR with 1 minute revalidation
-        tags: [`patient-history-${id}`],
-      },
-    )
+    const response = await fetchGraphQL<RawData>(GET_PATIENT_HISTORY, { patientId: id, take: 5, skip: 0 })
 
-    return data
+    if (!response.data) {
+      console.warn("No patient history found for patient ID:", id)
+      return {
+        patientConsultations: [],
+        patientPrescriptions: [],
+        patientLabResults: [],
+      }
+    }
+
+    return adaptToPatientHistory(response.data)
   } catch (error) {
     console.error("Error fetching patient history:", error)
     return {
@@ -99,10 +124,7 @@ async function getPatientHistory(id: string) {
 
 export default async function PatientHistoryPage({ params }: { params: { id: string } }) {
   const patient = await getPatientDetails(params.id)
-
-  if (!patient) {
-    notFound()
-  }
+  if (!patient) notFound()
 
   const history = await getPatientHistory(params.id)
 
@@ -125,19 +147,8 @@ export default async function PatientHistoryPage({ params }: { params: { id: str
         </p>
       </div>
 
-      <Suspense
-        fallback={
-          <div className="flex justify-center items-center min-h-[40vh]">
-            <div className="flex flex-col items-center gap-2">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-muted-foreground">Chargement de l'historique...</p>
-            </div>
-          </div>
-        }
-      >
-        <PatientHistoryTabs history={history} patientId={params.id} />
-      </Suspense>
+      {/* Suspense is unnecessary here since data is already loaded */}
+      <PatientHistoryTabs history={history} patientId={params.id} />
     </div>
   )
 }
-

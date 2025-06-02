@@ -1,23 +1,33 @@
-"use client"
+"use client";
 
-import type React from "react"
+import { FC, useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useActionState } from "react";
+import { createMedicalCertificate } from "@/app/doctor/actions";
+import { useFormStatus } from "react-dom";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { DatePicker } from "@/components/ui/date-picker"
-import { Label } from "@/components/ui/label"
-import { useToast } from "@/hooks/use-toast"
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { createMedicalCertificate, searchPatients } from "@/app/doctor/actions"
-import { useFormStatus } from "react-dom"
-import { useActionState } from "react"
+interface Patient {
+  id: string;
+  users: {
+    first_name: string;
+    last_name: string;
+    dateOfBirth: string;
+  };
+}
 
-// Initial state for the form
+interface CertificateFormProps {
+  patients: Patient[];
+}
+
 const initialState = {
   message: "",
   errors: {
@@ -30,187 +40,95 @@ const initialState = {
     restType: "",
   },
   success: false,
-}
+  certificateId: null as string | null,
+};
 
-// Form action with validation
-async function createCertificateAction(prevState: any, formData: FormData) {
-  // Extract form data
-  const patientId = formData.get("patientId") as string
-  const patientName = formData.get("patientName") as string
-  const diagnose = formData.get("diagnose") as string
-  const startDateStr = formData.get("startDate") as string
-  const endDateStr = formData.get("endDate") as string
-  const duration = Number.parseInt(formData.get("duration") as string)
-  const restType = formData.get("restType") as string
-  const notes = formData.get("notes") as string
-
-  // Validate form data
-  const errors = {
-    patientId: !patientId ? "Veuillez sélectionner un patient" : "",
-    patientName: !patientName ? "Veuillez sélectionner un patient" : "",
-    diagnose: !diagnose || diagnose.length < 3 ? "Le diagnostic est requis" : "",
-    startDate: !startDateStr ? "La date de début est requise" : "",
-    endDate: !endDateStr ? "La date de fin est requise" : "",
-    duration: isNaN(duration) || duration < 1 ? "La durée est requise" : "",
-    restType: !restType ? "Le type de repos est requis" : "",
-  }
-
-  // Check if there are any errors
-  if (Object.values(errors).some((error) => error)) {
-    return {
-      message: "Veuillez corriger les erreurs dans le formulaire",
-      errors,
-      success: false,
-    }
-  }
-
-  // Convert date strings to Date objects
-  const startDate = new Date(startDateStr)
-  const endDate = new Date(endDateStr)
-
-  // Create certificate data
-  const certificateData = {
-    patientId,
-    patientName,
-    diagnose,
-    startDate,
-    endDate,
-    duration,
-    restType,
-    notes,
-  }
-
-  // Submit the form
-  const result = await createMedicalCertificate(certificateData)
-
-  if (result.success) {
-    return {
-      message: "Le certificat médical a été créé avec succès",
-      errors: {},
-      success: true,
-      certificateId: result.certificateId,
-    }
-  } else {
-    return {
-      message: result.message || "Une erreur est survenue lors de la création du certificat",
-      errors: {},
-      success: false,
-    }
-  }
-}
-
-// Submit button component
 function SubmitButton() {
-  const { pending } = useFormStatus()
-
+  const { pending } = useFormStatus();
   return (
     <Button type="submit" disabled={pending}>
       {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
       Créer le certificat
     </Button>
-  )
+  );
 }
 
-export function NewCertificateForm() {
-  const router = useRouter()
-  const { toast } = useToast()
-  const [state, formAction] = useActionState(createCertificateAction, initialState)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [isPopoverOpen, setIsPopoverOpen] = useState(false)
-  const [searchResults, setSearchResults] = useState<any[]>([])
-  const [isSearching, setIsSearching] = useState(false)
-  const [selectedPatient, setSelectedPatient] = useState<{ id: string; name: string } | null>(null)
-  const [startDate, setStartDate] = useState<Date>(new Date())
-  const [endDate, setEndDate] = useState<Date>(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
-  const [duration, setDuration] = useState(7)
+const NewCertificateForm: FC<CertificateFormProps> = ({ patients }) => {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [state, formAction] = useActionState(createMedicalCertificate, initialState);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState<{ id: string; name: string } | null>(null);
+  const [startDate, setStartDate] = useState<Date>(new Date());
+  const [endDate, setEndDate] = useState<Date>(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+  const [duration, setDuration] = useState(7);
 
-  // Handle patient search
-  const handleSearch = async (term: string) => {
-    setSearchTerm(term)
+  const filteredPatients = useMemo(() => {
+    if (!searchTerm) return patients;
+    const lowerSearch = searchTerm.toLowerCase();
+    return patients.filter(
+      (patient) =>
+        patient.users.first_name.toLowerCase().includes(lowerSearch) ||
+        patient.users.last_name.toLowerCase().includes(lowerSearch)
+    );
+  }, [patients, searchTerm]);
 
-    if (term.length < 2) {
-      setSearchResults([])
-      return
+  const handleSelectPatient = (patientId: string, patientName: string) => {
+    setSelectedPatient({ id: patientId, name: patientName });
+    setIsPopoverOpen(false);
+    setSearchTerm("");
+  };
+
+  const updateDuration = (start: Date, end: Date) => {
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    setDuration(diffDays);
+  };
+
+  const updateEndDate = (newDuration: number) => {
+    const newEndDate = new Date(startDate);
+    newEndDate.setDate(startDate.getDate() + newDuration - 1);
+    setEndDate(newEndDate);
+  };
+
+  const handleStartDateChange = (date: Date) => {
+    setStartDate(date);
+    updateDuration(date, endDate);
+  };
+
+  const handleEndDateChange = (date: Date) => {
+    setEndDate(date);
+    updateDuration(startDate, date);
+  };
+
+  const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDuration = Number.parseInt(e.target.value);
+    if (!isNaN(newDuration) && newDuration > 0) {
+      setDuration(newDuration);
+      updateEndDate(newDuration);
     }
+  };
 
-    setIsSearching(true)
-    try {
-      const result = await searchPatients(term)
-      if (result.success) {
-        setSearchResults(result.patients)
-      } else {
-        toast({
-          title: "Erreur",
-          description: result.message || "Impossible de rechercher des patients",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error("Error searching patients:", error)
+  useEffect(() => {
+    if (state.success) {
+      toast({
+        title: "Certificat créé",
+        description: "Le certificat médical a été créé avec succès.",
+      });
+      router.push("/doctor/certificates");
+      router.refresh();
+    } else if (state.message && !state.success) {
       toast({
         title: "Erreur",
-        description: "Impossible de rechercher des patients",
+        description: state.message,
         variant: "destructive",
-      })
-    } finally {
-      setIsSearching(false)
+      });
     }
-  }
-
-  // Handle patient selection
-  const handleSelectPatient = (patientId: string, patientName: string) => {
-    setSelectedPatient({ id: patientId, name: patientName })
-    setIsPopoverOpen(false)
-  }
-
-  // Calculate duration when either date changes
-  const updateDuration = (start: Date, end: Date) => {
-    const diffTime = Math.abs(end.getTime() - start.getTime())
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1 // Include both start and end dates
-    setDuration(diffDays)
-  }
-
-  // Update end date when duration changes
-  const updateEndDate = (newDuration: number) => {
-    const newEndDate = new Date(startDate)
-    newEndDate.setDate(startDate.getDate() + newDuration - 1) // -1 because we include start date
-    setEndDate(newEndDate)
-  }
-
-  // Handle start date change
-  const handleStartDateChange = (date: Date) => {
-    setStartDate(date)
-    updateDuration(date, endDate)
-  }
-
-  // Handle end date change
-  const handleEndDateChange = (date: Date) => {
-    setEndDate(date)
-    updateDuration(startDate, date)
-  }
-
-  // Handle duration change
-  const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newDuration = Number.parseInt(e.target.value)
-    if (!isNaN(newDuration) && newDuration > 0) {
-      setDuration(newDuration)
-      updateEndDate(newDuration)
-    }
-  }
-
-  // Handle form success
-  if (state.success) {
-    toast({
-      title: "Certificat créé",
-      description: "Le certificat médical a été créé avec succès.",
-    })
-    router.push("/doctor/certificates")
-    router.refresh()
-  }
+  }, [state, router, toast]);
 
   return (
     <form action={formAction} className="space-y-6">
-      {/* Hidden inputs for dates */}
       <input type="hidden" name="startDate" value={startDate.toISOString()} />
       <input type="hidden" name="endDate" value={endDate.toISOString()} />
 
@@ -224,25 +142,29 @@ export function NewCertificateForm() {
           </PopoverTrigger>
           <PopoverContent className="w-full p-0" align="start">
             <Command>
-              <CommandInput placeholder="Rechercher un patient..." value={searchTerm} onValueChange={handleSearch} />
+              <CommandInput
+                placeholder="Rechercher un patient..."
+                value={searchTerm}
+                onValueChange={setSearchTerm}
+              />
               <CommandList>
                 <CommandEmpty>Aucun patient trouvé.</CommandEmpty>
                 <CommandGroup>
-                  {isSearching ? (
-                    <div className="flex items-center justify-center p-4">
-                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    </div>
-                  ) : (
-                    searchResults.map((patient) => (
-                      <CommandItem
-                        key={patient._id}
-                        value={patient._id}
-                        onSelect={() => handleSelectPatient(patient._id, `${patient.firstName} ${patient.lastName}`)}
-                      >
-                        {patient.firstName} {patient.lastName} - {new Date(patient.dateOfBirth).toLocaleDateString()}
-                      </CommandItem>
-                    ))
-                  )}
+                  {filteredPatients.map((patient) => (
+                    <CommandItem
+                      key={patient.id}
+                      value={patient.id}
+                      onSelect={() =>
+                        handleSelectPatient(
+                          patient.id,
+                          `${patient.users.first_name} ${patient.users.last_name}`
+                        )
+                      }
+                    >
+                      {patient.users.first_name} {patient.users.last_name} -{" "}
+                      {new Date(patient.users.dateOfBirth).toLocaleDateString()}
+                    </CommandItem>
+                  ))}
                 </CommandGroup>
               </CommandList>
             </Command>
@@ -296,6 +218,7 @@ export function NewCertificateForm() {
 
       <SubmitButton />
     </form>
-  )
-}
+  );
+};
 
+export default NewCertificateForm;

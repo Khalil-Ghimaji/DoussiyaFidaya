@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { cookies } from "next/headers"
 import { getAuthenticatedClient } from "@/lib/graphql/client"
-import { GET_CURRENT_USER } from "@/lib/graphql/queries/user"
+import { GET_CURRENT_USER, GET_NOTIFICATIONS } from "@/lib/graphql/queries"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -12,11 +12,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ModeToggle } from "@/components/mode-toggle"
-import { LogOut, User, Settings, Menu } from "lucide-react"
+import { LogOut, User, Settings, Menu, Bell } from "lucide-react"
 
-//TODO: GetCurrentUser
-// This component uses Server-Side Rendering (SSR) to fetch user data
-/*
+// Mock GraphQL query for notifications (add to your queries file)
+const GET_NOTIFICATIONS = `
+  query GetNotifications {
+    notifications {
+      id
+      message
+      createdAt
+      read
+    }
+  }
+`
+
 async function getCurrentUser() {
   const token = cookies().get("auth_token")?.value
 
@@ -33,16 +42,27 @@ async function getCurrentUser() {
     return null
   }
 }
-*/
-export default async function Header() {
-  //Todo:get user
-  //const user = await getCurrentUser()
-  const user = {
-    firstName: "John",
-    lastName: "Doe",
-    email: "hello@gmail.com",
-    profilePicture: "",
+
+async function getNotifications() {
+  const token = cookies().get("auth_token")?.value
+
+  if (!token) {
+    return []
   }
+
+  try {
+    const client = getAuthenticatedClient(token)
+    const { notifications } = await client.request(GET_NOTIFICATIONS)
+    return notifications || []
+  } catch (error) {
+    console.error("Error fetching notifications:", error)
+    return []
+  }
+}
+
+export default async function Header() {
+  const user = await getCurrentUser()
+  const notifications = await getNotifications()
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -70,6 +90,46 @@ export default async function Header() {
 
         <div className="flex items-center gap-4">
           <ModeToggle />
+
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Bell className="h-5 w-5" />
+                  {notifications.length > 0 && (
+                    <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500" />
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-80" align="end" forceMount>
+                <div className="flex items-center justify-between p-2">
+                  <p className="font-medium">Notifications</p>
+                  {notifications.length > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      {notifications.length} new
+                    </p>
+                  )}
+                </div>
+                <DropdownMenuSeparator />
+                {notifications.length > 0 ? (
+                  notifications.map((notification) => (
+                    <DropdownMenuItem key={notification.id} className="flex flex-col items-start">
+                      <span className={notification.read ? "text-muted-foreground" : "font-medium"}>
+                        {notification.message}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(notification.createdAt).toLocaleString()}
+                      </span>
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                  <DropdownMenuItem className="text-muted-foreground">
+                    No new notifications
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
           {user ? (
             <DropdownMenu>
@@ -169,4 +229,3 @@ export default async function Header() {
     </header>
   )
 }
-

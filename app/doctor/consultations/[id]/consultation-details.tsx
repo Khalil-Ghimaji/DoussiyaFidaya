@@ -91,7 +91,7 @@ export function ConsultationDetails({ consultation }: { consultation: Consultati
   }
 
   const consultationDate = new Date(consultation.date)
-
+  console.log("these are the consultations", consultation)
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <div className="lg:col-span-1">

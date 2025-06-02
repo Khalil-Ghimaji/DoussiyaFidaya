@@ -4,35 +4,18 @@ import { ArrowLeft, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
-import { executeGraphQLServer } from "@/lib/graphql-server"
 import { GET_PATIENT_DETAILS } from "@/lib/graphql/doctor-queries"
 import { LabRequestForm } from "./lab-request-form"
+import { adaptToPatient, Patient, PatientExtended } from "@/lib/graphql/types/patient"
+import { fetchGraphQL } from "@/lib/graphql-client"
+import { GET_PATIENT_EXTENDED } from "@/lib/graphql/queriesV2/patient"
 
-// Define the patient type
-type Patient = {
-  _id: string
-  firstName: string
-  lastName: string
-  dateOfBirth: string
-  gender: string
-  bloodType: string
-  allergies: string[]
-  profileImage: string
-}
 
-// Get patient details from the server
-async function getPatientDetails(id: string) {
+
+async function getPatientDetails(id: string): Promise<PatientExtended | null> {
   try {
-    const data = await executeGraphQLServer<{ patient: Patient }>(
-      GET_PATIENT_DETAILS,
-      { patientId: id },
-      {
-        cache: "no-store", // Use SSR for up-to-date data
-        tags: [`patient-${id}`],
-      },
-    )
-
-    return data.patient
+    const response = await fetchGraphQL<{ patient: any }>(GET_PATIENT_EXTENDED, { patientId: id })
+    return adaptToPatient(response.data)
   } catch (error) {
     console.error("Error fetching patient details:", error)
     return null
