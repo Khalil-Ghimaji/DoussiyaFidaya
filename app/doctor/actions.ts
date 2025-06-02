@@ -4,13 +4,14 @@ import { revalidateTag } from "next/cache"
 import { executeGraphQLServer } from "@/lib/graphql-server"
 import { auth } from "@/lib/auth"
 import { sendGraphQLMutation } from "@/lib/graphql-client"
+import { z } from "zod"
 
 // Appointment actions
 export async function declineAppointmentRequest(
-  appointmentId: string,
-  declineReason: string,
-  message?: string,
-  alternativeSlot?: string,
+    appointmentId: string,
+    declineReason: string,
+    message?: string,
+    alternativeSlot?: string,
 ) {
   try {
     const session = await auth()
@@ -28,17 +29,17 @@ export async function declineAppointmentRequest(
     `
 
     const result = await executeGraphQLServer(
-      mutation,
-      {
-        input: {
-          appointmentId,
-          doctorId: session.user.id,
-          declineReason,
-          message,
-          alternativeSlot,
+        mutation,
+        {
+          input: {
+            appointmentId,
+            doctorId: session.user.id,
+            declineReason,
+            message,
+            alternativeSlot,
+          },
         },
-      },
-      { cache: "no-store" },
+        { cache: "no-store" },
     )
 
     // Revalidate related data
@@ -73,14 +74,14 @@ export async function createConsultation(consultationData: any) {
     `
 
     const result = await executeGraphQLServer(
-      mutation,
-      {
-        input: {
-          ...consultationData,
-          doctorId: session.user.id,
+        mutation,
+        {
+          input: {
+            ...consultationData,
+            doctorId: session.user.id,
+          },
         },
-      },
-      { cache: "no-store" },
+        { cache: "no-store" },
     )
 
     // Revalidate related data
@@ -117,14 +118,14 @@ export async function createPatient(patientData: any) {
     `
 
     const result = await executeGraphQLServer(
-      mutation,
-      {
-        input: {
-          ...patientData,
-          doctorId: session.user.id,
+        mutation,
+        {
+          input: {
+            ...patientData,
+            doctorId: session.user.id,
+          },
         },
-      },
-      { cache: "no-store" },
+        { cache: "no-store" },
     )
 
     // Revalidate related data
@@ -157,15 +158,15 @@ export async function updatePatient(patientId: string, patientData: any) {
     `
 
     const result = await executeGraphQLServer(
-      mutation,
-      {
-        input: {
-          patientId,
-          doctorId: session.user.id,
-          ...patientData,
+        mutation,
+        {
+          input: {
+            patientId,
+            doctorId: session.user.id,
+            ...patientData,
+          },
         },
-      },
-      { cache: "no-store" },
+        { cache: "no-store" },
     )
 
     // Revalidate related data
@@ -200,16 +201,16 @@ export async function respondToEmergencyAccess(requestId: string, approved: bool
     `
 
     const result = await executeGraphQLServer(
-      mutation,
-      {
-        input: {
-          requestId,
-          doctorId: session.user.id,
-          approved,
-          notes,
+        mutation,
+        {
+          input: {
+            requestId,
+            doctorId: session.user.id,
+            approved,
+            notes,
+          },
         },
-      },
-      { cache: "no-store" },
+        { cache: "no-store" },
     )
 
     // Revalidate related data
@@ -243,14 +244,14 @@ export async function markMessageAsRead(messageId: string) {
     `
 
     const result = await executeGraphQLServer(
-      mutation,
-      {
-        input: {
-          messageId,
-          userId: session.user.id,
+        mutation,
+        {
+          input: {
+            messageId,
+            userId: session.user.id,
+          },
         },
-      },
-      { cache: "no-store" },
+        { cache: "no-store" },
     )
 
     // Revalidate related data
@@ -284,14 +285,14 @@ export async function sendMessage(messageData: any) {
     `
 
     const result = await executeGraphQLServer(
-      mutation,
-      {
-        input: {
-          ...messageData,
-          senderId: session.user.id,
+        mutation,
+        {
+          input: {
+            ...messageData,
+            senderId: session.user.id,
+          },
         },
-      },
-      { cache: "no-store" },
+        { cache: "no-store" },
     )
 
     // Revalidate related data
@@ -326,14 +327,14 @@ export async function createLabRequest(labRequestData: any) {
     `
 
     const result = await executeGraphQLServer(
-      mutation,
-      {
-        input: {
-          ...labRequestData,
-          doctorId: session.user.id,
+        mutation,
+        {
+          input: {
+            ...labRequestData,
+            doctorId: session.user.id,
+          },
         },
-      },
-      { cache: "no-store" },
+        { cache: "no-store" },
     )
 
     // Revalidate related data
@@ -369,14 +370,14 @@ export async function createPrescription(prescriptionData: any) {
     `
 
     const result = await executeGraphQLServer(
-      mutation,
-      {
-        input: {
-          ...prescriptionData,
-          doctorId: session.user.id,
+        mutation,
+        {
+          input: {
+            ...prescriptionData,
+            doctorId: session.user.id,
+          },
         },
-      },
-      { cache: "no-store" },
+        { cache: "no-store" },
     )
 
     // Revalidate related data
@@ -394,45 +395,132 @@ export async function createPrescription(prescriptionData: any) {
 }
 
 // Medical Certificate actions
-export async function createMedicalCertificate(_,certificateData: any) {
-  try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return { success: false, message: "Not authenticated" }
-    }
+const certificateSchema = z.object({
+  patientId: z.string().min(1, "Patient requis"),
+  patientName: z.string().optional(), // can be optional if not validated
+  diagnose: z.string().min(1, "Diagnostic requis"),
+  startDate: z.string().min(1, "Date de début requise"),
+  endDate: z.string().min(1, "Date de fin requise"),
+  duration: z.string().min(1, "Durée requise"),
+  restType: z.string().min(1, "Type de repos requis"),
+  notes: z.string().optional(),
+});
 
-    const mutation = `
-      mutation CreateMedicalCertificate($input: MedicalCertificateInput!) {
-        createMedicalCertificate(input: $input) {
-          _id
-          success
-          message
-        }
-      }
-    `
+export type CertificateFormState = {
+  message: string;
+  errors: {
+    patientId: string;
+    diagnose: string;
+    startDate: string;
+    endDate: string;
+    duration: string;
+    restType: string;
+  };
+  success: boolean;
+  certificateId?: string;
+};
 
-    const result = await executeGraphQLServer<{ createMedicalCertificate: { _id: string; success: boolean; message?: string } }>(
-      mutation,
-      {
-        input: {
-          ...certificateData,
-          doctorId: session.user.id,
-        },
-      },
-      { cache: "no-store" },
-    )
+const emptyErrors = {
+  patientId: "",
+  diagnose: "",
+  startDate: "",
+  endDate: "",
+  duration: "",
+  restType: "",
+};
 
-    // Revalidate related data
-    revalidateTag("certificates")
-    revalidateTag(`patient-${certificateData.patientId}`)
+export async function createMedicalCertificate(
+    _: CertificateFormState,
+    formData: FormData
+): Promise<CertificateFormState> {
+  const raw = {
+    patientId: formData.get('patientId'),
+    patientName: formData.get('patientName'),
+    diagnose: formData.get('diagnose'),
+    startDate: formData.get('startDate'),
+    endDate: formData.get('endDate'),
+    duration: formData.get('duration'),
+    restType: formData.get('restType'),
+    notes: formData.get('notes'),
+  };
 
-    return { success: true, certificateId: result.createMedicalCertificate._id }
-  } catch (error) {
-    console.error("Error creating medical certificate:", error)
+  const parsed = certificateSchema.safeParse(raw);
+
+  if (!parsed.success) {
+    const fieldErrors = parsed.error.flatten().fieldErrors;
     return {
       success: false,
-      message: error instanceof Error ? error.message : "An error occurred",
+      message: "Veuillez corriger les erreurs du formulaire.",
+      errors: {
+        patientId: fieldErrors.patientId?.[0] || "",
+        diagnose: fieldErrors.diagnose?.[0] || "",
+        startDate: fieldErrors.startDate?.[0] || "",
+        endDate: fieldErrors.endDate?.[0] || "",
+        duration: fieldErrors.duration?.[0] || "",
+        restType: fieldErrors.restType?.[0] || "",
+      },
+    };
+  }
+
+  try {
+    const session = {
+      user: {
+        id: "a9c3f34a-06b6-48be-b1c7-4e83b77e8680", //uncomment this
+      },
+    };
+
+    if (!session?.user?.id) {
+      return {
+        success: false,
+        message: "Non authentifié.",
+        errors: emptyErrors,
+      };
     }
+    const data = {
+      patients:{
+        connect:{
+          id: parsed.data.patientId
+        }
+      },
+      doctors:{
+        connect:{
+          id: session.user.id
+        }
+      },
+      description: parsed.data.diagnose+"\n"+parsed.data.notes,
+      start_date: parsed.data.startDate,
+      end_date: parsed.data.endDate,
+      type: parsed.data.restType,
+    }
+    const mutation = `
+      mutation Mutation($data: CertificatesCreateInput!) {
+  createOneCertificates(data: $data){
+    id
+  }
+}
+    `;
+
+    const result = await sendGraphQLMutation<any>(
+        mutation,
+        {data}
+    );
+
+    revalidateTag("certificates");
+    revalidateTag(`patient-${parsed.data.patientId}`);
+
+    return {
+      success: true,
+      message: "Certificat créé avec succès.",
+      errors: emptyErrors,
+      certificateId: result.data.createOneCertificates.id,
+    };
+  } catch (error) {
+    console.error("Error creating medical certificate:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Une erreur est survenue.",
+      errors: emptyErrors,
+    };
   }
 }
 
@@ -460,11 +548,11 @@ export async function searchPatients(searchTerm: string) {
     `
 
     const result = await executeGraphQLServer(
-      query,
-      {
-        searchTerm,
-      },
-      { cache: "no-store" },
+        query,
+        {
+          searchTerm,
+        },
+        { cache: "no-store" },
     )
 
     return {
@@ -490,12 +578,12 @@ export async function createAppointment(data: any) {
     }
 
     const result = await sendGraphQLMutation<CreateAppointmentResponse>(
-      `mutation CreateAppointment($data: RdvsCreateInput!) {
+        `mutation CreateAppointment($data: RdvsCreateInput!) {
         createOneRdvs(data: $data) {
           id
         }
       }`,
-      { data }
+        { data }
     )
 
     return { success: true, appointmentId: result.data.createOneRdvs.id }
@@ -613,29 +701,29 @@ export async function updateConsultation(id: string, patientId: string, values: 
         }
       }:{},
       lab_requests: values.labRequests ? {
-        create: 
-          values.labRequests.map(request => ({
-            type: request.type,
-            priority: request.priority,
-            description: request.description,
-            patients:{
-              connect:{
-                id: patientId
+        create:
+            values.labRequests.map(request => ({
+              type: request.type,
+              priority: request.priority,
+              description: request.description,
+              patients:{
+                connect:{
+                  id: patientId
+                }
               }
-            }
-          }))
-        
+            }))
+
       }:{}
     }
     console.dir(data2,{depth:null})
     console.log("i arrived here before the mutation")
     const result = await sendGraphQLMutation<any>(
-      UPDATE_CONSULTATION,
-      {
-        where: { id },
-        data1,
-        data2
-      }
+        UPDATE_CONSULTATION,
+        {
+          where: { id },
+          data1,
+          data2
+        }
     )
     console.log("this is the result", result)
 
