@@ -65,13 +65,13 @@ export default async function RootLayout({
       <body className={inter.className}>
         <ApolloWrapper>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <NotificationProvider>
+          {/*<NotificationProvider>*/}
             <div className="relative flex min-h-screen flex-col">
               <Header />
               <main className="flex-1">{children}</main>
               <Footer />
             </div>
-          </NotificationProvider>
+          {/*</NotificationProvider>*/}
         </ThemeProvider>
         </ApolloWrapper>
       </body>

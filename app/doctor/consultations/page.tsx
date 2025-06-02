@@ -7,6 +7,8 @@ import { GET_DOCTOR_CONSULTATIONS } from "@/lib/graphql/doctor-queries"
 import { auth } from "@/lib/auth"
 import { ConsultationsFilters } from "./consultations-filters"
 import { BackendConsultation, FrontendConsultation, transformConsultations } from "@/lib/transformers/consultation"
+import {cookies} from "next/headers";
+import {fetchGraphQL} from "@/lib/graphql-client";
 
 // Define the consultation type
 export type Consultation = FrontendConsultation
@@ -14,10 +16,13 @@ export type Consultation = FrontendConsultation
 // Get consultations from the server
 async function getDoctorConsultations() {
   try {
-    // const session = await auth()
-    // if (!session?.user?.id) {
-    //   throw new Error("User not authenticated")
-    // }
+    const token = (await cookies()).get("token")?.value || ""
+    console.log("this is the token", token)
+    if (!token) {
+      throw new Error("No authentication token found")
+    }
+    const userId = (await cookies()).get("userId")?.value || ""
+    console.log("this is the userId", userId)
 
     // Default to fetching consultations for the last 30 days
     const today = new Date()
@@ -27,22 +32,18 @@ async function getDoctorConsultations() {
     const startDate = thirtyDaysAgo.toISOString()
     const endDate = today.toISOString()
 
-    const data = await executeGraphQLServer<{ findManyConsultations: BackendConsultation[] }>(
+    const {data} = await fetchGraphQL<{ findManyConsultations: BackendConsultation[] }>(
       GET_DOCTOR_CONSULTATIONS,
       {
         where: {
-          doctor_id: { equals: "a9c3f34a-06b6-48be-b1c7-4e83b77e8680" },
+          doctor_id: { equals: userId },
           // date: {
           //   gte: startDate,
           //   lte: endDate
           // }
         //uncomment this
         }
-      },
-      {
-        cache: "no-store", // Use SSR for up-to-date data
-        tags: ["consultations"],
-      },
+      }
     )
     console.log("these are the consultations data", data)
 

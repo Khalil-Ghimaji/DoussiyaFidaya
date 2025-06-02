@@ -43,21 +43,19 @@ const GET_CONSULTATION_DETAILS = gql`
           quantity
         }
       }
-      consultation_lab_requests {
-        lab_requests {
+      lab_requests {
+        id
+        type
+        priority
+        description
+        lab_documents {
           id
-          type
-          priority
-          description
-          lab_documents {
+          status
+          laboratories {
+            name
+          }
+          lab_results {
             id
-            status
-            laboratories {
-              name
-            }
-            lab_results {
-              id
-            }
           }
         }
       }
@@ -97,23 +95,21 @@ interface ConsultationData {
         quantity: number;
       }[];
     };
-    consultation_lab_requests: {
-      lab_requests: {
+    lab_requests: {
+      id: string;
+      type: string;
+      priority: string;
+      description: string;
+      lab_documents: {
         id: string;
-        type: string;
-        priority: string;
-        description: string;
-        lab_documents: {
+        status: string;
+        laboratories: {
+          name: string;
+        };
+        lab_results: {
           id: string;
-          status: string;
-          laboratories: {
-            name: string;
-          };
-          lab_results: {
-            id: string;
-          }[];
         }[];
-      };
+      }[];
     }[];
   };
 }
@@ -132,7 +128,7 @@ async function ConsultationDetailsContent({ consultationId }: { consultationId: 
     const patient = consultation.patients;
     const doctor = consultation.doctors;
     const prescription = consultation.prescriptions;
-    const labRequests = consultation.consultation_lab_requests;
+    const labRequests = consultation.lab_requests;
 
     // Calculate age from date of birth
     const calculateAge = (birthDate: string) => {

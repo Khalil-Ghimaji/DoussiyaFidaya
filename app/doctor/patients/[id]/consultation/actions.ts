@@ -131,14 +131,12 @@ export async function createConsultationAction(patientId: string, formData: Form
       if (labRequestId) {
         // Link lab request to consultation
         const linkLabRequestMutation = `
-          mutation LinkConsultationLabRequest($ConsultationId: String!, $LabRequestId: String!) {
-            createOneConsultation_lab_requests(
-              data: {
-                lab_requests: { connect: { id: $LabRequestId } }
-                consultations: { connect: { id: $ConsultationId } }
-              }
+          mutation Mutation($ConsultationId: String!, $LabRequestId: String!) {
+            updateOneConsultations(
+              where: {id: $ConsultationId}
+              data: {lab_requests: {connect: {id: $LabRequestId}}}
             ) {
-              __typename
+              id
             }
           }
         `
