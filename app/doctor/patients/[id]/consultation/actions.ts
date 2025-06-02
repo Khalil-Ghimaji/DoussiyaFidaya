@@ -9,6 +9,12 @@ export async function createConsultationAction(patientId: string, formData: Form
   try {
     // Simulated logged-in doctor
     //TODO: Replace with actual session management
+
+    
+    //const storedSesion = await cookies();
+    //const doctorId = storedSesion.get("associatedId")?.value;
+
+
     const session = { user: { id: 'fc6d9c2c-6ec6-48c1-b762-fe35c2894b30' } }
 
     // Extract all form data first

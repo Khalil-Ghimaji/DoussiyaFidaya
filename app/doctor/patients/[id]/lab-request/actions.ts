@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { sendGraphQLMutation } from "@/lib/graphql-client"
 import { redirect } from "next/dist/server/api-utils"
+import { cookies } from "next/headers"
 
 type FormData = {
   type: string
@@ -14,12 +15,13 @@ type FormData = {
 export async function createLabRequestAction(patientId: string, formData: FormData) {
   try {
     // Map tests to description format if needed
-    //TODO: Replace with actual session management
-    const session = {
-    user: {
-      id: "fc6d9c2c-6ec6-48c1-b762-fe35c2894b30", // Simulated logged-in doctor
-    },
-  }
+   
+    //const session = {user: { id: "fc6d9c2c-6ec6-48c1-b762-fe35c2894b30"}  }
+
+  const storedSesion = await cookies();
+  const doctorId = storedSesion.get("associatedId")?.value;
+
+
     let description = formData.description || ""
 
     if (formData.tests && formData.tests.length > 0) {
@@ -68,7 +70,7 @@ export async function createLabRequestAction(patientId: string, formData: FormDa
 
     const variables = {
       patientId: patientId,
-      doctorId: session.user.id,
+      doctorId: doctorId,
       type: formData.type,
       description,
       priority: formData.priority,

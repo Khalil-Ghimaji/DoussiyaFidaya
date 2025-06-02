@@ -7,6 +7,7 @@ import { RecentConsultations } from "./recent-consultations"
 import { GET_DOCTOR_DASHBOARD } from "@/lib/graphql/queriesV2/doctor"
 import { executeGraphQLServer } from "@/lib/graphql-server"
 import { sendGraphQLMutation } from "@/lib/graphql-client"
+import { cookies } from "next/headers"
 
 // Define dashboard data types based on the new GraphQL structure
 type DashboardData = {
@@ -45,12 +46,14 @@ type DashboardData = {
 
 async function getDashboardData() {
   try {
-    //todo: Replace with actual session management
-    const session = { user: { id: "fc6d9c2c-6ec6-48c1-b762-fe35c2894b30" } } // Replace with actual session
-
+    
+    //const session = { user: { id: "fc6d9c2c-6ec6-48c1-b762-fe35c2894b30" } } // Replace with actual session
+    
+    const storedSesion = await cookies();
+    const doctorId = storedSesion.get("associatedId")?.value;
     const { data } = await sendGraphQLMutation<DashboardData>(
       GET_DOCTOR_DASHBOARD,
-       { doctorId: session.user.id }
+       { doctorId: doctorId }
     )
 
     return data
