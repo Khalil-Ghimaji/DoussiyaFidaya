@@ -13,8 +13,9 @@ export async function fetchGraphQL<T>(
     const result = await client.query<T>({
       query: typeof query === 'string' ? gql`${query}` : query,
       variables,
+      fetchPolicy: 'no-cache',
     });
-    
+    console.log(result.data);
     return { data: result.data };
   } catch (error) {
     console.error('GraphQL Error:', error);

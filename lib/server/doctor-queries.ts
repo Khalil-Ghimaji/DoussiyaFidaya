@@ -26,14 +26,14 @@ export const GET_DOCTOR_APPOINTMENTS = `
 `
 
 export const GET_APPOINTMENT_DETAILS = `
-  query GetAppointmentDetails($appointmentId: ID!) {
+  query GetAppointmentDetails($appointmentId: String!) {
     appointment(id: $appointmentId) {
-      _id
+      id
       date
       time
       duration
       patient {
-        _id
+        id
         firstName
         lastName
         avatar
@@ -54,7 +54,7 @@ export const GET_APPOINTMENT_DETAILS = `
         }
       }
       doctor {
-        _id
+        id
         firstName
         lastName
         specialty

@@ -1,4 +1,4 @@
-// User related queries
+  // User related queries
 export const GET_USER_PROFILE = `
   query GetUserProfile($userId: ID!) {
     user(id: $userId) {

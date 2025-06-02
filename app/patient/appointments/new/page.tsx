@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -16,8 +14,33 @@ import { fr } from "date-fns/locale"
 import { CalendarIcon, Loader2, Save } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
-import { createAppointment } from "@/app/doctor/actions"
-import { executeGraphQLServer } from "@/lib/graphql-server"
+import { gql } from '@apollo/client'
+import { fetchGraphQL } from "@/lib/graphql-client"
+import { auth } from "@/lib/auth"
+
+const CREATE_RDV = gql`
+  mutation CreateRdv($Motif: String!, $Status: String!, $date: DateTimeISO!, $time: DateTimeISO!, $id: String!, $id1: String!) {
+    createOneRdv_requests(
+      data: {
+        date: $date,
+        time: $time,
+        Motif: $Motif,
+        Status: $Status,
+        patients: { connect: { id: $id1 } },
+        doctors: { connect: { id: $id } }
+      }
+    ) {
+      Motif
+      Status
+      date
+      doctor_id
+      id
+      patient_id
+      rdv_id
+      time
+    }
+  }
+`
 
 // Heures disponibles
 const availableTimes = [
@@ -39,44 +62,59 @@ const availableTimes = [
   "17:30",
 ]
 
-// Type for the doctor data
-type Doctor = {
-  _id: string
-  firstName: string
-  lastName: string
+interface Doctor {
+  id: string
+  first_name: string
+  last_name: string
   specialty: string
 }
 
-export default async function NewAppointmentPage() {
+interface GraphQLResponse<T> {
+  data?: T
+  errors?: Array<{ message: string }>
+}
+
+interface CreateRdvResponse {
+  createOneRdv_requests: {
+    Motif: string
+    Status: string
+    date: string
+    doctor_id: string
+    id: string
+    patient_id: string
+    rdv_id: string | null
+    time: string
+  }
+}
+
+export default function NewAppointmentPage() {
   const router = useRouter()
   const { toast } = useToast()
-  // const { createAppointmentRequest, result } = usePatientAppointmentActions() // Removed usePatientAppointmentActions
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [loadingDoctors, setLoadingDoctors] = useState(true)
   const [doctorId, setDoctorId] = useState("")
   const [date, setDate] = useState<Date>()
-  const [timeStart, setTimeStart] = useState("")
-  const [timeEnd, setTimeEnd] = useState("")
+  const [time, setTime] = useState("")
   const [reason, setReason] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Fetch doctors using server component
+  // Fetch doctors using GraphQL
   useEffect(() => {
     const fetchDoctors = async () => {
       setLoadingDoctors(true)
       try {
-        const response = await executeGraphQLServer(
-          `query GetAvailableDoctors {
-            doctors {
-              _id
-              firstName
-              lastName
+        const { data } = await fetchGraphQL<{ findManyDoctors: Doctor[] }>(
+          `query MyQuery {
+            findManyDoctors {
+              id
+              first_name
+              last_name
               specialty
             }
-          }`,
+           }`,
           {},
         )
-        setDoctors(response.doctors || [])
+        setDoctors(data.findManyDoctors || [])
       } catch (error) {
         console.error("Error fetching doctors:", error)
         toast({
@@ -94,7 +132,7 @@ export default async function NewAppointmentPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!doctorId || !date || !timeStart || !timeEnd || !reason) {
+    if (!doctorId || !date || !time || !reason) {
       toast({
         title: "Erreur",
         description: "Veuillez remplir tous les champs",
@@ -103,50 +141,44 @@ export default async function NewAppointmentPage() {
       return
     }
 
-    // Vérifier que l'heure de fin est après l'heure de début
-    if (timeStart >= timeEnd) {
-      toast({
-        title: "Erreur",
-        description: "L'heure de fin doit être après l'heure de début",
-        variant: "destructive",
-      })
-      return
-    }
-
-    const appointmentData = {
-      doctorId,
-      preferredDate: format(date, "yyyy-MM-dd"),
-      preferredTimeStart: timeStart,
-      preferredTimeEnd: timeEnd,
-      reason,
-    }
-
     try {
       setIsSubmitting(true)
-      const formData = new FormData()
-      formData.append("patientId", "currentPatientId") // Replace with actual patient ID
-      formData.append("doctorId", appointmentData.doctorId)
-      formData.append("date", appointmentData.preferredDate)
-      formData.append("time", appointmentData.preferredTimeStart)
-      formData.append("duration", "30") // You will need to determine how to calculate this from the time
-      formData.append("type", "consultation")
-      formData.append("reason", appointmentData.reason)
+      
+      // Temporarily commented out auth check
+      // const session = await auth()
+      // if (!session?.user?.id) {
+      //   throw new Error("Vous devez être connecté pour prendre un rendez-vous")
+      // }
 
-      const result = await createAppointment(formData)
+      // Using a test patient ID for now
+      const testPatientId = "0c04a7d3-cfe7-4b2c-8a0f-7fe245b82230"
 
-      if (result.success) {
-        toast({
-          title: "Succès",
-          description: "Demande de rendez-vous créée avec succès",
-        })
-        router.push("/patient/appointments")
-      } else {
-        throw new Error(result.message || "Erreur lors de la création du rendez-vous.")
+      const formattedDate = format(date, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx")
+      const formattedTime = `${format(date, "yyyy-MM-dd")}T${time}:00.000+00:00`
+
+      const response = await fetchGraphQL<CreateRdvResponse>(CREATE_RDV, {
+        Motif: reason,
+        Status: "pending",
+        date: formattedDate,
+        time: formattedTime,
+        id: doctorId,
+        id1: testPatientId,
+      })
+
+      if (!response?.data?.createOneRdv_requests) {
+        throw new Error("Erreur lors de la création du rendez-vous")
       }
+
+      toast({
+        title: "Succès",
+        description: "Demande de rendez-vous créée avec succès",
+      })
+      router.push("/patient/appointments")
+      
     } catch (error) {
       toast({
         title: "Erreur",
-        description: (error as Error).message,
+        description: error instanceof Error ? error.message : "Une erreur est survenue",
         variant: "destructive",
       })
     } finally {
@@ -187,8 +219,8 @@ export default async function NewAppointmentPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {doctors.map((doctor) => (
-                      <SelectItem key={doctor._id} value={doctor._id}>
-                        {`${doctor.firstName} ${doctor.lastName}`} - {doctor.specialty}
+                      <SelectItem key={doctor.id} value={doctor.id}>
+                        {`${doctor.first_name} ${doctor.last_name}`} - {doctor.specialty}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -221,38 +253,20 @@ export default async function NewAppointmentPage() {
                 </Popover>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Heure de début souhaitée</Label>
-                  <Select value={timeStart} onValueChange={setTimeStart} disabled={!date} required>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Heure de début" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableTimes.map((time) => (
-                        <SelectItem key={time} value={time} disabled={timeEnd && time >= timeEnd}>
-                          {time}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Heure de fin souhaitée</Label>
-                  <Select value={timeEnd} onValueChange={setTimeEnd} disabled={!date || !timeStart} required>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Heure de fin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableTimes.map((time) => (
-                        <SelectItem key={time} value={time} disabled={time <= timeStart}>
-                          {time}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-2">
+                <Label>Heure souhaitée</Label>
+                <Select value={time} onValueChange={setTime} disabled={!date} required>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionnez une heure" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableTimes.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">

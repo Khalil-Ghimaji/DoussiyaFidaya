@@ -2,10 +2,70 @@ import { Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { Plus, Loader2 } from "lucide-react"
 import Link from "next/link"
-import { GET_PATIENT_APPOINTMENTS } from "@/lib/server/patient-queries"
 import { AppointmentsClient } from "./appointments-client"
-import {fetchGraphQL} from "@/lib/server/graphql-client";
+import {fetchGraphQL} from "@/lib/graphql-client";
 import {auth} from "@/lib/auth";
+import { gql } from '@apollo/client';
+import { cookies } from "next/headers"
+
+
+interface Doctor {
+  bio: string | null
+  education: string[]
+  experience: string[]
+  first_name: string
+  id: string
+  languages: string[]
+  last_name: string
+  profile_image: string | null
+  specialty: string
+  type: string
+  __typename: string
+}
+
+interface Appointment {
+  Motif: string
+  Status: string
+  date: string
+  doctor_id: string
+  id: string
+  patient_id: string
+  rdv_id: string | null
+  time: string
+  doctors: Doctor
+  __typename: string
+}
+
+interface AppointmentsResponse {
+  data: {
+    findManyRdv_requests: Appointment[]
+  }
+}
+
+const GET_PATIENT_APPOINTMENTS = gql`query GetRdvs($patient_id : UuidFilter) {
+  findManyRdv_requests(where: {patient_id: $patient_id}) {
+    Motif
+    Status
+    date
+    doctor_id
+    id
+    patient_id
+    rdv_id
+    time
+    doctors {
+      bio
+      education
+      experience
+      first_name
+      id
+      languages
+      last_name
+      profile_image
+      specialty
+      type
+    }
+  }
+}`
 
 // Revalidate this page every 5 minutes
 export const revalidate = 300
@@ -43,10 +103,38 @@ export default async function PatientAppointmentsPage() {
 }
 
 async function AppointmentsContent() {
-    const session = await auth()
-  const appointments = await fetchGraphQL(GET_PATIENT_APPOINTMENTS,{patientId:session?.user.id})
+  // decode user cookie
+  const cookieStore = await cookies();
+  const userCookie = cookieStore.get("user");
 
-  if (!appointments) {
+  let user = null;
+  if (userCookie?.value) {
+    try {
+      user = JSON.parse(userCookie.value);
+    
+    } catch (e) {
+      console.error("Failed to parse user cookie:", e);
+    }
+  }
+
+  // Example usage:
+  console.log("User ID:", user?.id);
+  console.log("User Email:", user?.email);
+  console.log("User First Name:", user?.first_name);
+  console.log("associated_id:", user?.associated_id);
+
+  // decode token 
+  const token = cookieStore.get("token")?.value || "";
+ 
+
+  const testId = "0c04a7d3-cfe7-4b2c-8a0f-7fe245b82230"
+  const { data } = await fetchGraphQL<{  findManyRdv_requests: Appointment[] }>(GET_PATIENT_APPOINTMENTS, {
+    patient_id: {
+      equals: testId
+    }
+  })
+
+  if (!data?.findManyRdv_requests) {
     return (
       <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded">
         <p className="font-bold">Erreur</p>
@@ -55,23 +143,25 @@ async function AppointmentsContent() {
     )
   }
 
+  const appointments = data.findManyRdv_requests
+
   // Group appointments by status
   const confirmedAppointments =
     appointments.filter(
-      (a) => a.status === "confirmed" && new Date(a.confirmedDate || a.preferredDate) >= new Date(),
+      (a: Appointment) => a.Status === "confirmed" && new Date(a.date) >= new Date(),
     ) || []
-  const pendingAppointments = appointments.filter((a) => a.status === "pending") || []
-  const completedAppointments = appointments.filter((a) => a.status === "completed") || []
-  const cancelledAppointments = appointments.filter((a) => a.status === "cancelled") || []
+  const pendingAppointments = appointments.filter((a: Appointment) => a.Status === "pending") || []
+  const completedAppointments = appointments.filter((a: Appointment) => a.Status === "completed") || []
+  const cancelledAppointments = appointments.filter((a: Appointment) => a.Status === "cancelled") || []
 
   // Get upcoming appointments for calendar view
   const upcomingAppointments =
     appointments
-      .filter((a) => a.status === "confirmed" && new Date(a.confirmedDate || a.preferredDate) >= new Date())
+      .filter((a: Appointment) => a.Status === "confirmed" && new Date(a.date) >= new Date())
       .sort(
-        (a, b) =>
-          new Date(a.confirmedDate || a.preferredDate).getTime() -
-          new Date(b.confirmedDate || b.preferredDate).getTime(),
+        (a: Appointment, b: Appointment) =>
+          new Date(a.date).getTime() -
+          new Date(b.date).getTime(),
       )
       .slice(0, 3) || []
 

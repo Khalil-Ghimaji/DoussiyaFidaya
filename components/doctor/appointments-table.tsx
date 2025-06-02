@@ -1,10 +1,15 @@
+"use client"
+
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { format, parseISO } from "date-fns"
 import { fr } from "date-fns/locale"
 import Link from "next/link"
-import { Calendar, Clock, CheckCircle2, XCircle, FileText, ArrowRight } from "lucide-react"
+import { Calendar, Clock, CheckCircle2, XCircle, FileText, ArrowRight, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { fetchGraphQL } from "@/lib/graphql-client"
 
 type Appointment = {
   _id: string
@@ -34,18 +39,30 @@ interface DoctorAppointmentsTableProps {
   isPast?: boolean
 }
 
+interface GraphQLResponse<T> {
+  data?: T
+  errors?: Array<{ message: string }>
+}
+
+const UPDATE_RDV_REQUEST = `
+  mutation UpdateRdvRequest($set: String!, $where: Rdv_requestsWhereUniqueInput!) {
+    updateOneRdv_requests(
+      data: { Status: { set: $set } }
+      where: $where
+    ) {
+      Status
+      id
+    }
+  }
+`
+
 export function DoctorAppointmentsTable({
   appointments,
   isPending = false,
   isPast = false,
 }: DoctorAppointmentsTableProps) {
-  if (appointments.length === 0) {
-    return (
-      <div className="text-center py-10">
-        <p className="text-muted-foreground">Aucun rendez-vous à afficher</p>
-      </div>
-    )
-  }
+  const { toast } = useToast()
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
 
   const getStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
@@ -101,6 +118,51 @@ export function DoctorAppointmentsTable({
       default:
         return <Badge variant="outline">{type}</Badge>
     }
+  }
+
+  const handleCancel = async (appointmentId: string) => {
+    try {
+      setCancellingId(appointmentId)
+      
+      const { errors: updateErrors } = await fetchGraphQL(
+        UPDATE_RDV_REQUEST,
+        {
+          set: "cancelled",
+          where: {
+            id: appointmentId
+          }
+        }
+      ) as GraphQLResponse<unknown>
+
+      if (updateErrors) {
+        throw new Error(updateErrors.map(e => e.message).join(", "))
+      }
+
+      toast({
+        title: "Demande refusée",
+        description: "La demande de rendez-vous a été refusée avec succès",
+      })
+
+      // Refresh the page to update the list
+      window.location.reload()
+    } catch (error) {
+      console.error("Error cancelling appointment:", error)
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors du refus de la demande",
+        variant: "destructive",
+      })
+    } finally {
+      setCancellingId(null)
+    }
+  }
+
+  if (appointments.length === 0) {
+    return (
+      <div className="text-center py-10">
+        <p className="text-muted-foreground">Aucun rendez-vous à afficher</p>
+      </div>
+    )
   }
 
   return (
@@ -172,12 +234,15 @@ export function DoctorAppointmentsTable({
                           size="sm"
                           variant="outline"
                           className="text-red-600 border-red-200 hover:bg-red-50"
-                          asChild
+                          onClick={() => handleCancel(appointment._id)}
+                          disabled={cancellingId === appointment._id}
                         >
-                          <Link href={`/doctor/appointments/requests/${appointment._id}/decline`}>
+                          {cancellingId === appointment._id ? (
+                            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                          ) : (
                             <XCircle className="mr-1 h-4 w-4" />
-                            Refuser
-                          </Link>
+                          )}
+                          Refuser
                         </Button>
                       </>
                     ) : isPast ? (

@@ -12,9 +12,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import VitalSignsForm from "@/components/doctor/vital-signs-form"
-import PrescriptionForm from "@/components/doctor/prescription-form"
-import LabRequestForm from "@/components/doctor/lab-request-form"
+
 import { useToast } from "@/hooks/use-toast"
 import { createConsultation } from "@/app/doctor/actions"
 
