@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -10,56 +11,68 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { MessageSquarePlus, Search, Loader2 } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { useDoctorPatients } from "@/hooks/use-doctor-patients"
+import { useChat } from "@/hooks/use-chat"
+import { toast } from "@/hooks/use-toast"
 
 export function NewMessageDialog() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [recipient, setRecipient] = useState("")
-  const [subject, setSubject] = useState("")
-  const [content, setContent] = useState("")
-  const [recipientType, setRecipientType] = useState("doctor")
+  const [open, setOpen] = useState(false)
+  const [messageContent, setMessageContent] = useState("")
+  const [patientSearch, setPatientSearch] = useState("")
+  const [doctorSearch, setDoctorSearch] = useState("")
+  const [selectedPatient, setSelectedPatient] = useState<string | null>(null)
+  const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null)
   const [isSending, setIsSending] = useState(false)
-  const { toast } = useToast()
 
-  const resetForm = () => {
-    setRecipient("")
-    setSubject("")
-    setContent("")
-    setRecipientType("doctor")
-  }
+  const { patients, loading: loadingPatients } = useDoctorPatients()
+  const { sendMessage, isConnected } = useChat()
 
-  const handleSend = async () => {
-    if (!recipient || !subject || !content) {
+  const filteredPatients = patients.filter((patient) =>
+      patient.name.toLowerCase().includes(patientSearch.toLowerCase()),
+  )
+
+  const selectedPatientData = patients.find((p) => p.id === selectedPatient)
+  const filteredDoctors =
+      selectedPatientData?.doctors.filter((doctor) => doctor.name.toLowerCase().includes(doctorSearch.toLowerCase())) ||
+      []
+
+  const handleSendMessage = async () => {
+    if (!selectedPatient || !selectedDoctor || !messageContent.trim() || !isConnected) {
       toast({
-        title: "Formulaire incomplet",
-        description: "Veuillez remplir tous les champs obligatoires.",
+        title: "Erreur",
+        description: "Veuillez sélectionner un patient, un docteur et saisir un message",
         variant: "destructive",
       })
       return
     }
 
-    setIsSending(true)
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      setIsSending(true)
+      await sendMessage({
+        receiverId: selectedDoctor,
+        patientId: selectedPatient,
+        content: messageContent.trim(),
+        attachments: [],
+      })
 
       toast({
         title: "Message envoyé",
-        description: "Votre message a été envoyé avec succès.",
+        description: "Votre message a été envoyé avec succès",
       })
 
-      resetForm()
-      setIsOpen(false)
+      setOpen(false)
+      setMessageContent("")
+      setSelectedPatient(null)
+      setSelectedDoctor(null)
     } catch (error) {
+      console.error("Failed to send message:", error)
       toast({
         title: "Erreur",
-        description: "Une erreur est survenue. Veuillez réessayer.",
+        description: "Impossible d'envoyer le message",
         variant: "destructive",
       })
     } finally {
@@ -68,89 +81,130 @@ export function NewMessageDialog() {
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Nouveau message
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[525px]">
-        <DialogHeader>
-          <DialogTitle>Nouveau message</DialogTitle>
-          <DialogDescription>Créez un nouveau message à envoyer à un collègue ou un patient.</DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="recipient-type" className="text-right">
-              Type
-            </Label>
-            <Select value={recipientType} onValueChange={setRecipientType}>
-              <SelectTrigger id="recipient-type" className="col-span-3">
-                <SelectValue placeholder="Sélectionnez le type de destinataire" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="doctor">Médecin</SelectItem>
-                <SelectItem value="patient">Patient</SelectItem>
-                <SelectItem value="laboratory">Laboratoire</SelectItem>
-                <SelectItem value="pharmacy">Pharmacie</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="recipient" className="text-right">
-              Destinataire
-            </Label>
-            <Input
-              id="recipient"
-              placeholder="Nom du destinataire"
-              value={recipient}
-              onChange={(e) => setRecipient(e.target.value)}
-              className="col-span-3"
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="subject" className="text-right">
-              Sujet
-            </Label>
-            <Input
-              id="subject"
-              placeholder="Sujet du message"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="col-span-3"
-            />
-          </div>
-          <div className="grid grid-cols-4 items-start gap-4">
-            <Label htmlFor="content" className="text-right pt-2">
-              Message
-            </Label>
-            <Textarea
-              id="content"
-              placeholder="Contenu de votre message"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="col-span-3 min-h-[120px]"
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => {
-              resetForm()
-              setIsOpen(false)
-            }}
-            disabled={isSending}
-          >
-            Annuler
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button>
+            <MessageSquarePlus className="mr-2 h-4 w-4" />
+            Nouveau message
           </Button>
-          <Button onClick={handleSend} disabled={isSending}>
-            {isSending ? "Envoi en cours..." : "Envoyer"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Nouveau message</DialogTitle>
+            <DialogDescription>Sélectionnez un patient et un docteur pour démarrer une conversation</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Patient selection */}
+            <div className="space-y-2">
+              <h4 className="font-medium">Sélectionnez un patient</h4>
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                    placeholder="Rechercher un patient..."
+                    className="pl-8"
+                    value={patientSearch}
+                    onChange={(e) => setPatientSearch(e.target.value)}
+                />
+              </div>
+
+              <ScrollArea className="h-[150px] border rounded-md">
+                {loadingPatients ? (
+                    <div className="flex items-center justify-center h-full">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                ) : filteredPatients.length === 0 ? (
+                    <div className="p-4 text-center text-muted-foreground">Aucun patient trouvé</div>
+                ) : (
+                    <div className="p-1">
+                      {filteredPatients.map((patient) => (
+                          <div
+                              key={patient.id}
+                              className={`p-2 cursor-pointer rounded-md ${
+                                  selectedPatient === patient.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                              }`}
+                              onClick={() => {
+                                setSelectedPatient(patient.id)
+                                setSelectedDoctor(null) // Reset doctor selection when patient changes
+                              }}
+                          >
+                            {patient.name}
+                          </div>
+                      ))}
+                    </div>
+                )}
+              </ScrollArea>
+            </div>
+
+            {/* Doctor selection - only show if a patient is selected */}
+            {selectedPatient && (
+                <div className="space-y-2">
+                  <h4 className="font-medium">Sélectionnez un docteur</h4>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Rechercher un docteur..."
+                        className="pl-8"
+                        value={doctorSearch}
+                        onChange={(e) => setDoctorSearch(e.target.value)}
+                    />
+                  </div>
+
+                  <ScrollArea className="h-[150px] border rounded-md">
+                    {filteredDoctors.length === 0 ? (
+                        <div className="p-4 text-center text-muted-foreground">Aucun docteur trouvé pour ce patient</div>
+                    ) : (
+                        <div className="p-1">
+                          {filteredDoctors.map((doctor) => (
+                              <div
+                                  key={doctor.id}
+                                  className={`p-2 cursor-pointer rounded-md ${
+                                      selectedDoctor === doctor.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                                  }`}
+                                  onClick={() => setSelectedDoctor(doctor.id)}
+                              >
+                                {doctor.name}
+                              </div>
+                          ))}
+                        </div>
+                    )}
+                  </ScrollArea>
+                </div>
+            )}
+
+            {/* Message input - only show if both patient and doctor are selected */}
+            {selectedPatient && selectedDoctor && (
+                <div className="space-y-2">
+                  <h4 className="font-medium">Message</h4>
+                  <Textarea
+                      placeholder="Saisissez votre message..."
+                      value={messageContent}
+                      onChange={(e) => setMessageContent(e.target.value)}
+                      rows={4}
+                  />
+                </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+                onClick={handleSendMessage}
+                disabled={!selectedPatient || !selectedDoctor || !messageContent.trim() || isSending || !isConnected}
+            >
+              {isSending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Envoi...
+                  </>
+              ) : (
+                  "Envoyer"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
   )
 }
-
