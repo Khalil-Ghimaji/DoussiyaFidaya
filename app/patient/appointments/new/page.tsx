@@ -16,7 +16,6 @@ import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { gql } from '@apollo/client'
 import { fetchGraphQL } from "@/lib/graphql-client"
-import { auth } from "@/lib/auth"
 
 const CREATE_RDV = gql`
   mutation CreateRdv($Motif: String!, $Status: String!, $date: DateTimeISO!, $time: DateTimeISO!, $id: String!, $id1: String!) {
@@ -97,6 +96,39 @@ export default function NewAppointmentPage() {
   const [time, setTime] = useState("")
   const [reason, setReason] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [patientId, setPatientId] = useState<string>("")
+
+  // Get patient ID from cookie when component mounts
+  useEffect(() => {
+    const getUserFromCookie = () => {
+      try {
+        const cookies = document.cookie.split(';');
+        const userCookie = cookies.find(cookie => cookie.trim().startsWith('user='));
+        if (userCookie) {
+          const user = JSON.parse(decodeURIComponent(userCookie.split('=')[1]));
+          console.log("Found user in cookie:", user);
+          if (user?.associated_id) {
+            setPatientId(user.associated_id);
+            console.log("Set patient ID from cookie:", user.associated_id);
+          } else {
+            throw new Error("No associated_id found in user cookie");
+          }
+        } else {
+          throw new Error("No user cookie found");
+        }
+      } catch (error) {
+        console.error("Error getting user from cookie:", error);
+        toast({
+          title: "Erreur d'authentification",
+          description: "Veuillez vous reconnecter",
+          variant: "destructive",
+        });
+        router.push('/auth/login');
+      }
+    };
+
+    getUserFromCookie();
+  }, [toast, router]);
 
   // Fetch doctors using GraphQL
   useEffect(() => {
@@ -141,17 +173,19 @@ export default function NewAppointmentPage() {
       return
     }
 
+    if (!patientId) {
+      toast({
+        title: "Erreur d'authentification",
+        description: "Votre session a expiré. Veuillez vous reconnecter.",
+        variant: "destructive",
+      });
+      router.push('/auth/login');
+      return;
+    }
+
     try {
       setIsSubmitting(true)
-      
-      // Temporarily commented out auth check
-      // const session = await auth()
-      // if (!session?.user?.id) {
-      //   throw new Error("Vous devez être connecté pour prendre un rendez-vous")
-      // }
-
-      // Using a test patient ID for now
-      const testPatientId = "0c04a7d3-cfe7-4b2c-8a0f-7fe245b82230"
+      console.log("Creating appointment with patient ID:", patientId);
 
       const formattedDate = format(date, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx")
       const formattedTime = `${format(date, "yyyy-MM-dd")}T${time}:00.000+00:00`
@@ -162,7 +196,7 @@ export default function NewAppointmentPage() {
         date: formattedDate,
         time: formattedTime,
         id: doctorId,
-        id1: testPatientId,
+        id1: patientId, // Using the ID from cookie instead of hardcoded test ID
       })
 
       if (!response?.data?.createOneRdv_requests) {
@@ -176,6 +210,7 @@ export default function NewAppointmentPage() {
       router.push("/patient/appointments")
       
     } catch (error) {
+      console.error("Error creating appointment:", error);
       toast({
         title: "Erreur",
         description: error instanceof Error ? error.message : "Une erreur est survenue",
