@@ -111,26 +111,21 @@ async function AppointmentsContent() {
   if (userCookie?.value) {
     try {
       user = JSON.parse(userCookie.value);
-    
     } catch (e) {
       console.error("Failed to parse user cookie:", e);
+      throw new Error("Session invalide. Veuillez vous reconnecter.");
     }
   }
 
-  // Example usage:
-  console.log("User ID:", user?.id);
-  console.log("User Email:", user?.email);
-  console.log("User First Name:", user?.first_name);
-  console.log("associated_id:", user?.associated_id);
+  if (!user?.associated_id) {
+    throw new Error("ID patient non trouvé. Veuillez vous reconnecter.");
+  }
 
-  // decode token 
-  const token = cookieStore.get("token")?.value || "";
- 
+  console.log("Using patient ID from cookie:", user.associated_id);
 
-  const testId = "0c04a7d3-cfe7-4b2c-8a0f-7fe245b82230"
-  const { data } = await fetchGraphQL<{  findManyRdv_requests: Appointment[] }>(GET_PATIENT_APPOINTMENTS, {
+  const { data } = await fetchGraphQL<{ findManyRdv_requests: Appointment[] }>(GET_PATIENT_APPOINTMENTS, {
     patient_id: {
-      equals: testId
+      equals: user.associated_id
     }
   })
 
