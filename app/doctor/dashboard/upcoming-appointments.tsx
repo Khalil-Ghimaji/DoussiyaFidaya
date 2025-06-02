@@ -60,9 +60,22 @@ export function UpcomingAppointments({ appointments }: UpcomingAppointmentsProps
   }
 
   const formatAppointmentDate = (dateStr: string, timeStr: string) => {
-    const date = new Date(`${dateStr}T${timeStr}`)
-    return formatDistanceToNow(date, { addSuffix: true, locale: fr })
-  }
+    // Ensure the date and time are properly formatted
+    const [year, month, day] = dateStr.split('-');
+    const [hours, minutes] = timeStr.split(':');
+    
+    // Create a date object with proper UTC handling
+    const date = new Date();
+    date.setUTCFullYear(parseInt(year, 10));
+    date.setUTCMonth(parseInt(month, 10) - 1); // months are 0-indexed
+    date.setUTCDate(parseInt(day, 10));
+    date.setUTCHours(parseInt(hours, 10));
+    date.setUTCMinutes(parseInt(minutes, 10));
+    date.setUTCSeconds(0);
+    date.setUTCMilliseconds(0);
+
+    return formatDistanceToNow(date, { addSuffix: true, locale: fr });
+}
 
   return (
     <Card className="h-full">
@@ -128,4 +141,3 @@ export function UpcomingAppointments({ appointments }: UpcomingAppointmentsProps
     </Card>
   )
 }
-
