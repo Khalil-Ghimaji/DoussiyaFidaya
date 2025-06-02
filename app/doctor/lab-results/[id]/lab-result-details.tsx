@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState } from "react"
 import { format } from "date-fns"
@@ -19,6 +19,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Download, FileText, Printer, Share2, MessageSquare, Calendar, Building, Phone } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import Link from "next/link"
 
 type LabResult = {
   _id: string
@@ -26,23 +27,15 @@ type LabResult = {
   type: string
   status: string
   requestDate: string
-  completionDate: string
-  resultSummary: string
-  resultDetails: string
-  attachments: string[]
+  completionDate: string | null
+  result: string | null
   patient: {
     _id: string
     firstName: string
     lastName: string
     dateOfBirth: string
     gender: string
-    profileImage: string
-  }
-  doctor: {
-    _id: string
-    firstName: string
-    lastName: string
-    speciality: string
+    profileImage: string | null
   }
   laboratory: {
     name: string
@@ -150,18 +143,10 @@ export function LabResultDetails({ labResult }: LabResultDetailsProps) {
                       {labResult.patient.firstName} {labResult.patient.lastName}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {labResult.patient.gender}, né(e) le {labResult.patient.dateOfBirth}
+                      {labResult.patient.gender}, né(e) le {formatDate(labResult.patient.dateOfBirth)}
                     </p>
                   </div>
                 </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-2">Médecin prescripteur</h3>
-                <p className="font-medium">
-                  Dr. {labResult.doctor.firstName} {labResult.doctor.lastName}
-                </p>
-                <p className="text-sm text-muted-foreground">{labResult.doctor.speciality}</p>
               </div>
             </div>
 
@@ -200,29 +185,15 @@ export function LabResultDetails({ labResult }: LabResultDetailsProps) {
                   <p className="text-sm">
                     <span className="font-medium">Réalisation :</span> {formatDate(labResult.date)}
                   </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Validation :</span> {formatDate(labResult.completionDate)}
-                  </p>
+                  {labResult.completionDate && (
+                    <p className="text-sm">
+                      <span className="font-medium">Validation :</span> {formatDate(labResult.completionDate)}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-2">Actions</h3>
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" onClick={handlePrint}>
-                    <Printer className="h-4 w-4 mr-1" />
-                    Imprimer
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={handleDownload}>
-                    <Download className="h-4 w-4 mr-1" />
-                    Télécharger
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setIsShareDialogOpen(true)}>
-                    <Share2 className="h-4 w-4 mr-1" />
-                    Partager
-                  </Button>
-                </div>
-              </div>
+             
             </div>
           </div>
         </CardContent>
@@ -234,10 +205,6 @@ export function LabResultDetails({ labResult }: LabResultDetailsProps) {
             <FileText className="h-4 w-4 mr-2" />
             Résultats
           </TabsTrigger>
-          <TabsTrigger value="attachments">
-            <FileText className="h-4 w-4 mr-2" />
-            Pièces jointes ({labResult.attachments.length})
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="results" className="mt-4">
@@ -247,55 +214,17 @@ export function LabResultDetails({ labResult }: LabResultDetailsProps) {
             </CardHeader>
             <CardContent>
               <div className="p-4 bg-muted rounded-md">
-                <p>{labResult.resultSummary}</p>
-              </div>
-
-              <Separator className="my-6" />
-
-              <div className="space-y-4">
-                <h3 className="font-medium">Détails des résultats</h3>
-                <div className="whitespace-pre-line">{labResult.resultDetails}</div>
+                <p>{labResult.result || "Aucun résultat disponible"}</p>
               </div>
             </CardContent>
             <CardFooter className="flex justify-end">
               <Button asChild>
-                <a href={`/doctor/patients/${labResult.patient._id}`}>
+                <Link href={`/doctor/patients/${labResult.patient._id}`}>
                   <MessageSquare className="mr-2 h-4 w-4" />
                   Consulter le dossier patient
-                </a>
+                </Link>
               </Button>
             </CardFooter>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="attachments" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Pièces jointes</CardTitle>
-              <CardDescription>Documents et images associés à cette analyse</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {labResult.attachments.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {labResult.attachments.map((attachment, index) => (
-                    <div key={index} className="border rounded-md p-3 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-muted-foreground" />
-                        <span>Pièce jointe {index + 1}</span>
-                      </div>
-                      <Button size="sm" variant="ghost">
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <FileText className="h-10 w-10 text-muted-foreground mb-2" />
-                  <p className="text-muted-foreground">Aucune pièce jointe disponible</p>
-                </div>
-              )}
-            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
@@ -346,4 +275,3 @@ export function LabResultDetails({ labResult }: LabResultDetailsProps) {
     </div>
   )
 }
-

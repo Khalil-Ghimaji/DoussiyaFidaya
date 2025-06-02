@@ -184,3 +184,39 @@ query GetPatientAnalyses(
     }
   }
 }`
+export const GET_LABORATORY_ANALYSIS_DETAILS = gql`
+query GetPatientAnalyses(
+  $labDocumentID: String!
+) {
+  anlyses: findManyLab_documents(
+    where: { 
+      id: { equals: $labDocumentID }
+    }
+  ) {
+    id 
+    date:requested_at
+    status
+    completed_at
+    result:notes
+    lab_requests {
+      type
+      priority
+    }
+    patients{
+      id
+      date_of_birth
+      gender
+      profile_image
+      users{
+        first_name
+        last_name
+      }
+    }
+    laboratories{
+      name
+      address
+      phone
+    }
+    }
+  }
+`  
