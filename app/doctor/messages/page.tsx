@@ -1,34 +1,84 @@
-"use client"
+import { headers } from "next/headers";
 
-import { Suspense } from "react"
-import { Loader2 } from "lucide-react"
-import { MessagesList } from "./messages-list"
-import { NewMessageDialog } from "./new-message-dialog"
+import { MessagingInterface } from "./messaging-interface";
+import type { Conversation as FrontendConversation } from "./messaging-interface";
 
-export default function MessagesPage() {
-    return (
-        <div className="container py-8">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Messages</h1>
-                    <p className="text-muted-foreground">Gérez vos communications avec les patients et collègues</p>
-                </div>
 
-                <NewMessageDialog />
-            </div>
+async function getInitialConversations(): Promise<FrontendConversation[]> {
+    try {
+        const headerStore = headers();
+        const cookieString = headerStore.get("cookie") || "";
+        const cookies = cookieString.split(";").map((cookie) => cookie.trim());
 
-            <Suspense
-                fallback={
-                    <div className="flex justify-center items-center min-h-[40vh]">
-                        <div className="flex flex-col items-center gap-2">
-                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                            <p className="text-muted-foreground">Chargement des messages...</p>
-                        </div>
-                    </div>
+        const associatedIdCookie = cookies.find((cookie) =>
+            cookie.startsWith("associatedId="),
+        );
+
+        if (!associatedIdCookie) {
+            console.error("❌ Aucun associatedId trouvé dans les cookies pour getInitialConversations");
+            return [];
+        }
+        const associatedId = associatedIdCookie.substring(associatedIdCookie.indexOf("=") + 1);
+        console.log("👤 AssociatedId trouvé pour getInitialConversations:", associatedId);
+
+
+        const tokenCookieNames = ["token", "authToken", "auth_token", "jwt", "access_token"];
+        let authToken = null;
+
+        for (const name of tokenCookieNames) {
+            const cookie = cookies.find((c) => c.startsWith(`${name}=`));
+            if (cookie) {
+                authToken = cookie.substring(cookie.indexOf("=") + 1);
+                // Clean the token if it's wrapped in quotes
+                if (authToken.startsWith('"') && authToken.endsWith('"')) {
+                    authToken = authToken.slice(1, -1);
                 }
-            >
-                <MessagesList />
-            </Suspense>
+                try {
+                    authToken = decodeURIComponent(authToken);
+                } catch (e) {
+
+                }
+                break;
+            }
+        }
+
+        if (!authToken) {
+            console.error("❌ Aucun token d'authentification trouvé dans les cookies pour getInitialConversations");
+            return [];
+        }
+
+        const apiUrl = process.env.API_URL || "http://localhost:4000"; // Ensure this points to your backend
+        const response = await fetch(`${apiUrl}/chat/conversations/sender`, {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${authToken}`,
+                "Content-Type": "application/json",
+            },
+            cache: "no-store",
+        });
+
+        if (!response.ok) {
+            const errorData = await response.text();
+            console.error(`Erreur API (${response.status}) lors de la récupération des conversations initiales: ${errorData}`);
+            return [];
+        }
+
+        const data = await response.json();
+        console.log("haw lenaaaaa\n",data,"\njjjjjj")
+
+        return data.conversations || [];
+    } catch (error) {
+        console.error("Erreur lors de la récupération des conversations initiales:", error);
+        return [];
+    }
+}
+
+export default async function MessagesPage() {
+    const initialConversations = await getInitialConversations();
+
+    return (
+        <div className="h-screen">
+            <MessagingInterface initialConversations={initialConversations} />
         </div>
-    )
+    );
 }
