@@ -1,71 +1,137 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
-import { redirect } from "next/navigation"
-import { executeGraphQL } from "@/lib/graphql-client"
 import { gql } from "graphql-request"
+import {fetchGraphQL} from "@/lib/graphql-client";
 
-// Define GraphQL queries/mutations here
-const SEARCH_DOCTORS = gql`
-  query SearchDoctors($query: String!) {
-    searchDoctors(query: $query) {
-      id
-      name
-      specialty
-      title
-    }
-  }
-`
+function getDistanceInKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth radius in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
 
-export async function bookAppointment(formData: FormData) {
-  const doctorId = formData.get("doctorId") as string
+  const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1 * Math.PI / 180) *
+      Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) ** 2;
 
-  try {
-    // In a real application, we would create an appointment request here
-    // or redirect to the appointment booking page with the doctor pre-selected
-
-    // For now, we'll just redirect to the appointment booking page
-    redirect(`/patient/appointments/new?doctorId=${doctorId}`)
-  } catch (error) {
-    console.error("Error booking appointment:", error)
-    throw new Error("Failed to book appointment. Please try again.")
-  }
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
-export async function searchDoctors(query: string) {
-  try {
-    const { searchDoctors } = await executeGraphQL({
-      query: SEARCH_DOCTORS,
-      variables: { query },
+const FILTER_DOCTORS = gql`query MyQuery($where: DoctorsWhereInput!) {
+  findManyDoctors(where: $where) {
+    bio
+    education
+    experience
+    first_name
+    id
+    is_license_verified
+    languages
+    last_name
+    profile_image
+    specialty
+    users {
+      address
+      email
+      phone
+    }
+  }
+}`
+
+export async function getDoctorsWithLocation(param: {
+  specialty: string | undefined;
+  search: string | undefined;
+  lng: number | undefined;
+  radius: number | undefined;
+  lat: number | undefined
+}) {
+  const {data:doctors} = await fetchGraphQL<any>(FILTER_DOCTORS,
+      {
+        where: {
+          ...(param.specialty && { specialty: { equals: param.specialty } }),
+          // OR: param.search
+          //     ? [
+          //       { first_name: { contains: param.search, mode: 'insensitive' } },
+          //       { last_name: { contains: param.search, mode: 'insensitive' } },
+          //     ]
+          //     : undefined,
+        },
+      }
+  );
+  console.log('these are the doctors',doctors.findManyDoctors);
+    if (!doctors || !doctors.findManyDoctors) {
+      return [];
+    }
+  const filteredDoctors = (
+      await Promise.all(
+          doctors.findManyDoctors.map(async (doctor: any) => {
+            if (!doctor.users || !doctor.users.address) return null;
+
+            const address = doctor.users.address;
+            const { latitude: lat, longitude: lng } = await geocodeAddress(address);
+
+            if (param.lat && param.lng && param.radius) {
+              const distance = getDistanceInKm(param.lat, param.lng, lat, lng);
+              console.log('this is the distance of doctor',doctor.first_name, distance);
+              return distance <= param.radius ? doctor : null;
+            }
+            return doctor;
+          })
+      )
+  ).filter((doctor) => doctor !== null);
+  console.log("these are the filtered doctors",filteredDoctors);
+  const transformedDoctors = filteredDoctors.map(async (doctor: any) => {
+    const {latitude, longitude} = await geocodeAddress(doctor.users?.address || '');
+    console.log('this is the doctor lat and lng', latitude, longitude);
+    return ({
+      id: doctor.id,
+      name: `${doctor.first_name} ${doctor.last_name}`,
+      specialty: doctor.specialty,
+      title: doctor.users?.address || 'Unknown',
+      bio: doctor.bio,
+      education: doctor.education,
+      experience: doctor.experience,
+      profileImage: doctor.profile_image,
+      languages: doctor.languages,
+      isLicenseVerified: doctor.is_license_verified,
+      location: {
+        address: doctor.users?.address,
+        latitude,
+        longitude,
+      }
     })
+  });
+  console.log('these are the transformed doctors', transformedDoctors);
+  const result =await Promise.all(transformedDoctors);
+  console.log('this is the result', result);
+    return result;
+}
+export async function geocodeAddress(address: string) {
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json`;
 
-    return searchDoctors || []
-  } catch (error) {
-    console.error("Error searching doctors:", error)
-    return []
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'MediSys/1.0' // Required by Nominatim
+    },
+    next: { revalidate: 0 } // optional: disables caching for fetch
+  });
+
+  if (!response.ok) {
+    throw new Error('Geocoding API request failed');
   }
+
+  const data = await response.json();
+
+  if (!data || data.length === 0) {
+    throw new Error('No results found');
+  }
+
+  const { lat, lon } = data[0];
+
+  return {
+    latitude: parseFloat(lat),
+    longitude: parseFloat(lon)
+  };
 }
 
-export async function requestDoctorInfo(formData: FormData) {
-  const doctorId = formData.get("doctorId") as string
-  const name = formData.get("name") as string
-  const email = formData.get("email") as string
-  const message = formData.get("message") as string
-
-  try {
-    // In a real application, we would send this information to the backend
-    // For now, we'll just simulate a successful request
-
-    // Revalidate the doctor's page to show the updated request status
-    revalidatePath(`/doctors/${doctorId}`)
-
-    return { success: true, message: "Your request has been sent successfully." }
-  } catch (error) {
-    console.error("Error requesting doctor information:", error)
-    return {
-      success: false,
-      message: "Failed to send your request. Please try again.",
-    }
-  }
-}
 

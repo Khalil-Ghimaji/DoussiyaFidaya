@@ -6,14 +6,16 @@ export async function middleware(request: NextRequest) {
   const token = request.cookies.get('token')
   const user = request.cookies.get('user')
 
+  const publics = ['/about', '/contact', '/terms', '/privacy', '/help','/doctors','/']
   // Public paths that don't require authentication
-  const publicPaths = ['/auth/login', '/auth/register', '/auth/verify-code', '/auth/forgot-password']
+  const publicPaths = ['/auth/login', '/auth/register', '/auth/verify-code', '/auth/forgot-password','/auth/reset-password', '/auth/verify-email', '/auth/verify-email-success', '/auth/verify-email-failure']
   const isPublicPath = publicPaths.some(path => request.nextUrl.pathname.startsWith(path))
 
   // Skip middleware for email verification API endpoints
-  if (request.nextUrl.pathname.startsWith('/api/email-verification')) {
+  if (request.nextUrl.pathname.startsWith('/api/email-verification') || publics.includes(request.nextUrl.pathname)) {
     return NextResponse.next()
   }
+
 
   // If trying to access a public path while logged in, redirect to dashboard
   if (isPublicPath && token && user) {
