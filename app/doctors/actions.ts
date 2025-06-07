@@ -43,12 +43,14 @@ export async function getDoctorsWithLocation(param: {
   search: string | undefined;
   lng: number | undefined;
   radius: number | undefined;
-  lat: number | undefined
+  lat: number | undefined;
+  language: string | undefined;
 }) {
   const {data:doctors} = await fetchGraphQL<any>(FILTER_DOCTORS,
       {
         where: {
           ...(param.specialty && { specialty: { equals: param.specialty } }),
+          ...(param.language && {OR: { languages: { has: param.language } } })
           // OR: param.search
           //     ? [
           //       { first_name: { contains: param.search, mode: 'insensitive' } },

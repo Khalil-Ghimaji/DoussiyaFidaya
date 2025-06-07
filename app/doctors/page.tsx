@@ -1,4 +1,3 @@
-import { Suspense } from "react"
 import type { Metadata } from "next"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -8,9 +7,9 @@ import { Calendar, Languages, GraduationCap, Clock, Map, Grid } from "lucide-rea
 import Link from "next/link"
 import DoctorSearch from "./doctor-search"
 import DoctorFilters from "./doctor-filters"
-import DoctorMap from "./doctor-map"
 import { getDoctorsWithLocation} from "./actions"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import DoctorTabs from "@/app/doctors/doctor-tabs";
+import DoctorMap from "@/app/doctors/doctor-map";
 
 export const metadata: Metadata = {
   title: "Find Doctors Near You | Healthcare Platform",
@@ -81,9 +80,7 @@ export default async function DoctorsPage({
     })).filter((doctor) => doctor.name.includes(searchParams.search || ""));
   console.log("these are the doctors in page.tsx", doctors)
   console.dir(doctors, { depth: null })
-
-  const defaultView = await searchParams.view || "map"
-
+  const defaultView = searchParams.view || "map";
   return (
       <main className="container mx-auto px-4 py-8 md:py-12">
         <div className="space-y-4 mb-8">
@@ -103,31 +100,11 @@ export default async function DoctorsPage({
 
           <div className="lg:col-span-3">
             <DoctorSearch />
-
-            <Tabs value={defaultView} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="map" className="flex items-center gap-2">
-                  <Map className="h-4 w-4" />
-                  Map View
-                </TabsTrigger>
-                <TabsTrigger value="list" className="flex items-center gap-2">
-                  <Grid className="h-4 w-4" />
-                  List View
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="map" className="space-y-0">
-                <Suspense fallback={<MapSkeleton />}>
-                  <DoctorMap doctors={doctors} searchParameters={searchParams} />
-                </Suspense>
-              </TabsContent>
-
-              <TabsContent value="list" className="space-y-0">
-                <Suspense fallback={<DoctorsListSkeleton />}>
-                  <DoctorsList doctors={doctors} searchParams={searchParams} />
-                </Suspense>
-              </TabsContent>
-            </Tabs>
+            <DoctorTabs
+                defaultValue={defaultView}
+                mapTab={<DoctorMap doctors={doctors} searchParameters={searchParams}/> }
+                listTab={<DoctorsList doctors={doctors} searchParams={searchParams}/>}
+            />
           </div>
         </div>
       </main>
@@ -141,14 +118,7 @@ function DoctorsList({
   doctors: any[]
   searchParams: any
 }) {
-  // Apply client-side filters
-  const filteredDoctors = doctors.filter(async (doctor) => {
-    console.log('logging works')
-    return !(await searchParams.language && !doctor.languages.includes(searchParams.language));
-
-  })
-
-  if (filteredDoctors.length === 0) {
+  if (doctors.length === 0) {
     return (
         <div className="text-center py-12">
           <h3 className="text-lg font-medium">No doctors found</h3>
@@ -159,7 +129,7 @@ function DoctorsList({
 
   return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {filteredDoctors.map((doctor) => (
+        {doctors.map((doctor) => (
             <DoctorCard key={doctor.id} doctor={doctor} />
         ))}
       </div>
