@@ -93,8 +93,8 @@ export default function DoctorMap({doctors, searchParameters}: DoctorMapProps) {
     }
 
     const handleGetDirections = (doctor: any) => {
-        if (userLocation) {
-            const url = `https://www.google.com/maps/dir/${userLocation[0]},${userLocation[1]}/${doctor.location.latitude},${doctor.location.longitude}`
+        if (searchParams.lat && searchParams.lng) {
+            const url = `https://www.google.com/maps/dir/${searchParams.lat},${searchParams.lng}/${doctor.location.latitude},${doctor.location.longitude}`
             window.open(url, "_blank")
         } else {
             const url = `https://www.google.com/maps/search/${doctor.location.address}`

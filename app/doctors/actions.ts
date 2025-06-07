@@ -50,7 +50,7 @@ export async function getDoctorsWithLocation(param: {
       {
         where: {
           ...(param.specialty && { specialty: { equals: param.specialty } }),
-          ...(param.language && {OR: { languages: { has: param.language } } })
+          ...(param.language && {AND: { languages: { has: param.language } } })
           // OR: param.search
           //     ? [
           //       { first_name: { contains: param.search, mode: 'insensitive' } },

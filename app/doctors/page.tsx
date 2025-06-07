@@ -77,6 +77,7 @@ export default async function DoctorsPage({
       lat: searchParams.lat ? Number.parseFloat(searchParams.lat) : undefined,
       lng: searchParams.lng ? Number.parseFloat(searchParams.lng) : undefined,
       radius: searchParams.radius ? Number.parseInt(searchParams.radius) : undefined,
+      language: searchParams.language?.toLowerCase(),
     })).filter((doctor) => doctor.name.includes(searchParams.search || ""));
   console.log("these are the doctors in page.tsx", doctors)
   console.dir(doctors, { depth: null })
