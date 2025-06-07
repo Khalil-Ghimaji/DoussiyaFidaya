@@ -156,7 +156,9 @@ export function ConsultationDetails({ consultation }: { consultation: Consultati
 
             <div>
               <h3 className="font-medium mb-2">Notes</h3>
-              <p>{consultation.notes || "Aucune note"}</p>
+              <p>{consultation.notes ? consultation.notes.split("\n").map((line, index) => (
+                  <span key={index}>{line}<br/></span>
+              )) : "Aucune note"}</p>
             </div>
           </CardContent>
         </Card>

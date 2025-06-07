@@ -44,13 +44,18 @@ export interface FrontendConsultation {
 
 export function transformConsultation(backendConsultation: BackendConsultation): FrontendConsultation {
   const dateTime = new Date(backendConsultation.date);
+  const {Diagnostic,Motif} = backendConsultation.notes.reduce((acc, item) => {
+    const [key, value] = item.split(/:(.+)/); // Split only at the first colon
+    acc[key.trim()] = value.trim();
+    return acc;
+  }, {});
   
   return {
     _id: backendConsultation.id,
     date: dateTime.toISOString().split('T')[0],
     time: dateTime.toTimeString().split(' ')[0],
-    reason: backendConsultation.notes[0] || '',
-    diagnosis: backendConsultation.measures?.diagnosis || '',
+    reason: Motif || '',
+    diagnosis: Diagnostic || '',
     hasPrescription: !!backendConsultation.prescriptions,
     hasLabRequest: backendConsultation.lab_requests.length > 0,
     patient: {

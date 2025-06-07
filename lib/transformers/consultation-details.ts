@@ -110,15 +110,22 @@ export interface FrontendConsultationDetails {
 
 export function transformConsultationDetails(backendConsultation: BackendConsultationDetails): FrontendConsultationDetails {
   const dateTime = new Date(backendConsultation.date);
+  const informations = backendConsultation.notes.reduce((acc, item) => {
+    const [key, value] = item.split(/:(.+)/); // Split only at the first colon
+    acc[key.trim()] = value.trim();
+    return acc;
+  }, {});
+  console.log("these are the converted object",informations)
+  const { Motif, Diagnostic, ...notes } = informations;
   
   return {
     _id: backendConsultation.id,
     date: dateTime.toISOString().split('T')[0],
     time: dateTime.toTimeString().split(' ')[0],
     duration: 30, // Default duration
-    reason: backendConsultation.notes[0] || '',
-    notes: backendConsultation.notes.slice(1).join('\n') || '',
-    diagnosis: backendConsultation.measures?.diagnosis || '',
+    reason: informations.Motif || '',
+    notes: Object.entries(notes).map(([key, value]) => `${key}: ${value}`).join('\n') || '',
+    diagnosis: informations.Diagnostic || '',
     createdBy: 'system', // Default value since it's not in the backend schema
     createdAt: new Date().toISOString(), // Default to current time since it's not in the backend schema
     updatedAt: new Date().toISOString(), // Default to current time since it's not in the backend schema

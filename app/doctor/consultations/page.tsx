@@ -37,10 +37,10 @@ async function getDoctorConsultations() {
       {
         where: {
           doctor_id: { equals: userId },
-          // date: {
-          //   gte: startDate,
-          //   lte: endDate
-          // }
+          date: {
+            gte: startDate,
+            lte: endDate
+          }
         //uncomment this
         }
       }
@@ -56,6 +56,7 @@ async function getDoctorConsultations() {
 
 export default async function ConsultationsPage() {
   const consultations = await getDoctorConsultations()
+  console.log("these are the consultations in the frontend", consultations)
 
   return (
     <div className="container py-8">
