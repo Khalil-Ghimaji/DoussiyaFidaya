@@ -43,11 +43,11 @@ type Appointment = {
   }
 }
 
-const CREATE_CONSULTATION = gql`
-  mutation CreateConsultation(
+const CREATE_CONSULTATION_WITH_PRESCRIPTION = gql`
+  mutation CreateConsultationWithPrescription(
     $patientId: String!
     $doctorId: String!
-    $prescriptionId: String
+    $prescriptionId: String!
     $date: DateTimeISO!
     $section: String
     $measures: JSON
@@ -58,6 +58,34 @@ const CREATE_CONSULTATION = gql`
         patients: { connect: { id: $patientId } }
         doctors: { connect: { id: $doctorId } }
         prescriptions: { connect: { id: $prescriptionId } }
+        date: $date
+        section: $section
+        measures: $measures
+        notes: $notes
+      }
+    ) {
+      id
+      date
+      section
+      measures
+      notes
+    }
+  }
+`
+
+const CREATE_CONSULTATION_WITHOUT_PRESCRIPTION = gql`
+  mutation CreateConsultationWithoutPrescription(
+    $patientId: String!
+    $doctorId: String!
+    $date: DateTimeISO!
+    $section: String
+    $measures: JSON
+    $notes: ConsultationsCreatenotesInput
+  ) {
+    createOneConsultations(
+      data: {
+        patients: { connect: { id: $patientId } }
+        doctors: { connect: { id: $doctorId } }
         date: $date
         section: $section
         measures: $measures
@@ -471,7 +499,7 @@ export function ConsultationForm({ appointment }: { appointment: Appointment }) 
       ]
 
       // Step 3: Create consultation
-      const consultationData = {
+      const baseConsultationData = {
         patientId: appointment.patient._id,
         doctorId: appointment.doctor._id,
         date: new Date().toISOString(),
@@ -480,15 +508,21 @@ export function ConsultationForm({ appointment }: { appointment: Appointment }) 
         notes: { set: consultationNotes }
       }
 
-      // Only add prescriptionId if it exists
+      let consultationResponse;
       if (prescriptionId) {
-        Object.assign(consultationData, { prescriptionId })
+        consultationResponse = await fetchGraphQL<ConsultationData>(
+          CREATE_CONSULTATION_WITH_PRESCRIPTION,
+          {
+            ...baseConsultationData,
+            prescriptionId
+          }
+        )
+      } else {
+        consultationResponse = await fetchGraphQL<ConsultationData>(
+          CREATE_CONSULTATION_WITHOUT_PRESCRIPTION,
+          baseConsultationData
+        )
       }
-
-      const consultationResponse = await fetchGraphQL<ConsultationData>(
-        CREATE_CONSULTATION,
-        consultationData
-      )
 
       const consultationId = consultationResponse.data.createOneConsultations?.id
       if (!consultationId) {
