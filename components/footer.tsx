@@ -1,6 +1,4 @@
 import Link from "next/link"
-import { graphqlClient } from "@/lib/graphql/client"
-import { GET_FOOTER_CONTENT } from "@/lib/graphql/queries/content"
 
 // This component uses Static Site Generation (SSG) since footer content rarely changes
 export const revalidate = 86400 // Revalidate once per day

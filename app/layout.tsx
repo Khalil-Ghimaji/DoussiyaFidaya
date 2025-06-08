@@ -1,8 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
-import { graphqlClient } from "@/lib/graphql/client"
-import { GET_SITE_CONFIG } from "@/lib/graphql/queries/content"
 import { ThemeProvider } from "@/components/theme-provider"
 import Header from "@/components/header"
 import Footer from "@/components/footer"
@@ -71,6 +69,7 @@ export default async function RootLayout({
               <main className="flex-1">{children}</main>
               <Footer />
             </div>
+            <Toaster/>
           </NotificationProvider>
         </ThemeProvider>
         </ApolloWrapper>
@@ -83,3 +82,4 @@ export default async function RootLayout({
 
 import './globals.css'
 import {NotificationProvider} from "@/components/notification-provider";
+import {Toaster} from "@/components/ui/toaster";

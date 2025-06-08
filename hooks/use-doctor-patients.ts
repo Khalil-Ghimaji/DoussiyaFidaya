@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSession } from "next-auth/react"
 import { FIND_DOCTOR_PATIENTS } from "@/lib/graphql/queries/doctor-patients"
 import { graphqlClient } from "@/lib/graphql/client"
 

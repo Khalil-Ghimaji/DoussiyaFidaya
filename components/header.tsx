@@ -1,7 +1,5 @@
 import Link from "next/link"
 import { cookies } from "next/headers"
-import { getAuthenticatedClient } from "@/lib/graphql/client"
-import { GET_CURRENT_USER } from "@/lib/graphql/queries/user"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -20,9 +18,6 @@ import { fetchGraphQL } from "@/lib/graphql-client"
 async function getCurrentUser() {
   const token = (await cookies()).get("token")?.value || ""
   const userId = (await cookies()).get("userId")?.value || ""
-  const role = (await cookies()).get("role")?.value || ""
-  const user = { userId, role }
-
   if (!token) {
     return null
   }
