@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
-import { graphqlClient } from "@/lib/graphql/client"
 import { GET_TERMS_CONTENT } from "@/lib/graphql/queries/content"
+import {client} from "@/lib/apollo-client";
 
 // This page uses Static Site Generation (SSG) since terms content rarely changes
 export const revalidate = 86400 // Revalidate once per day
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 async function getTermsContent() {
   try {
-    const { termsAndConditions } = await graphqlClient.request(GET_TERMS_CONTENT)
+    const { termsAndConditions } = await client.request(GET_TERMS_CONTENT)
     return termsAndConditions
   } catch (error) {
     console.error("Error fetching terms content:", error)

@@ -14,11 +14,11 @@ interface Message {
 
 const LoadingDots = () => {
   return (
-    <div className="flex space-x-1 items-center">
-      <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-      <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-      <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-    </div>
+      <div className="flex space-x-1 items-center">
+        <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+        <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+        <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+      </div>
   );
 };
 
@@ -93,10 +93,10 @@ export function ChatComponent() {
       setMessages(prev => [...prev, { content: formattedResponse, isUser: false, type: 'text' }]);
     } catch (error) {
       console.error('Erreur:', error);
-      setMessages(prev => [...prev, { 
-        content: '❌ Désolé, une erreur est survenue. Veuillez réessayer plus tard.', 
-        isUser: false, 
-        type: 'text' 
+      setMessages(prev => [...prev, {
+        content: '❌ Désolé, une erreur est survenue. Veuillez réessayer plus tard.',
+        isUser: false,
+        type: 'text'
       }]);
     } finally {
       setIsLoading(false);
@@ -104,73 +104,73 @@ export function ChatComponent() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] max-w-4xl mx-auto bg-gray-50">
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message, index) => (
-          <div
-            key={index}
-            className={cn(
-              "flex items-start gap-3",
-              message.isUser ? "justify-end" : "justify-start"
-            )}
-          >
-            {!message.isUser && (
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <Bot className="w-5 h-5 text-primary" />
+      <div className="flex flex-col h-[calc(100vh-4rem)] max-w-4xl mx-auto bg-gray-50">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {messages.map((message, index) => (
+              <div
+                  key={index}
+                  className={cn(
+                      "flex items-start gap-3",
+                      message.isUser ? "justify-end" : "justify-start"
+                  )}
+              >
+                {!message.isUser && (
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Bot className="w-5 h-5 text-primary" />
+                    </div>
+                )}
+                <div
+                    className={cn(
+                        "max-w-[80%] rounded-2xl p-4 shadow-sm",
+                        message.isUser
+                            ? "bg-primary text-primary-foreground ml-12"
+                            : "bg-white border border-gray-200 mr-12"
+                    )}
+                >
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+                </div>
+                {message.isUser && (
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="w-5 h-5 text-primary" />
+                    </div>
+                )}
               </div>
-            )}
-            <div
-              className={cn(
-                "max-w-[80%] rounded-2xl p-4 shadow-sm",
-                message.isUser
-                  ? "bg-primary text-primary-foreground ml-12"
-                  : "bg-white border border-gray-200 mr-12"
-              )}
-            >
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
-            </div>
-            {message.isUser && (
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <User className="w-5 h-5 text-primary" />
+          ))}
+          {isLoading && (
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Bot className="w-5 h-5 text-primary" />
+                </div>
+                <div className="max-w-[80%] rounded-2xl p-4 shadow-sm bg-white border border-gray-200 mr-12">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500">En train de réfléchir</span>
+                    <LoadingDots />
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        ))}
-        {isLoading && (
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-              <Bot className="w-5 h-5 text-primary" />
-            </div>
-            <div className="max-w-[80%] rounded-2xl p-4 shadow-sm bg-white border border-gray-200 mr-12">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">En train de réfléchir</span>
-                <LoadingDots />
-              </div>
-            </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      <form onSubmit={handleSubmit} className="p-4 border-t bg-white">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Décrivez vos symptômes ou posez votre question..."
-            className="flex-1 rounded-xl border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            disabled={isLoading}
-          />
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-          >
-            <Send className="h-4 w-4" />
-          </button>
+          )}
+          <div ref={messagesEndRef} />
         </div>
-      </form>
-    </div>
+
+        <form onSubmit={handleSubmit} className="p-4 border-t bg-white">
+          <div className="flex gap-2">
+            <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Décrivez vos symptômes ou posez votre question..."
+                className="flex-1 rounded-xl border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                disabled={isLoading}
+            />
+            <button
+                type="submit"
+                disabled={isLoading}
+                className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </div>
+        </form>
+      </div>
   );
-} 
+}

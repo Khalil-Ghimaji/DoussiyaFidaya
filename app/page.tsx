@@ -1,11 +1,11 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import Image from "next/image"
-import { graphqlClient } from "@/lib/graphql/client"
 import { GET_HOME_PAGE_CONTENT } from "@/lib/graphql/queries/content"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { CheckCircle, Calendar, FileText, ArrowRight } from "lucide-react"
+import {client} from "@/lib/graphql/client";
 
 export const metadata: Metadata = {
   title: "MediSystem | Plateforme de santé numérique",
@@ -18,7 +18,7 @@ export const revalidate = 3600 // Revalidate every hour
 
 async function getHomePageContent() {
   try {
-    const { homePageContent } = await graphqlClient.request(GET_HOME_PAGE_CONTENT)
+    const { homePageContent } = await client.request(GET_HOME_PAGE_CONTENT)
     return homePageContent
   } catch (error) {
     console.error("Error fetching home page content:", error)
