@@ -2,25 +2,21 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, Trash2, Save, ArrowLeft } from "lucide-react"
+import { Plus, Trash2, Save, ArrowLeft, Upload, Check, X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createPrescriptionAction } from "./actions"
 import { PatientExtended } from "@/lib/graphql/types/patient"
+import { prescriptionOCRService } from './service'
+import Image from 'next/image'
 
-
-type PrescriptionFormProps = {
-  patient: PatientExtended
-}
-
-type Medication = {
+interface Medication {
   name: string
   dosage: string
   frequency: string
@@ -28,29 +24,38 @@ type Medication = {
   quantity: number
 }
 
-export function PrescriptionForm({ patient }: PrescriptionFormProps) {
+interface PrescriptionFormProps {
+  patient: PatientExtended
+  onSubmit: (data: { medications: Medication[]; instructions: string }) => void
+  initialData?: { medications: Medication[]; instructions: string }
+}
+
+export function PrescriptionForm({ patient, onSubmit, initialData }: PrescriptionFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [medications, setMedications] = useState<Medication[]>([
-    { name: "", dosage: "", frequency: "", duration: "", quantity: 1 },
-  ])
-  const [notes, setNotes] = useState("")
+  const [medications, setMedications] = useState<Medication[]>(
+    initialData?.medications || [{ name: '', dosage: '', frequency: '', duration: '', quantity: 1 }]
+  )
+  const [instructions, setInstructions] = useState(initialData?.instructions || '')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const router = useRouter()
   const { toast } = useToast()
+  const [isUploading, setIsUploading] = useState(false)
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [extractedData, setExtractedData] = useState<{ medications: Medication[]; instructions: string } | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const addMedication = () => {
-    setMedications([...medications, { name: "", dosage: "", frequency: "", duration: "", quantity: 1 }])
+  const handleAddMedication = () => {
+    setMedications([...medications, { name: '', dosage: '', frequency: '', duration: '', quantity: 1 }])
   }
 
-  const removeMedication = (index: number) => {
-    if (medications.length > 1) {
-      setMedications(medications.filter((_, i) => i !== index))
-    }
+  const handleRemoveMedication = (index: number) => {
+    setMedications(medications.filter((_, i) => i !== index))
   }
 
-  const updateMedication = (index: number, field: keyof Medication, value: string | number) => {
-    const updatedMedications = medications.map((med, i) => (i === index ? { ...med, [field]: value } : med))
-    setMedications(updatedMedications)
+  const handleMedicationChange = (index: number, field: keyof Medication, value: string | number) => {
+    const newMedications = [...medications]
+    newMedications[index] = { ...newMedications[index], [field]: value }
+    setMedications(newMedications)
   }
 
   const validateForm = () => {
@@ -108,7 +113,7 @@ export function PrescriptionForm({ patient }: PrescriptionFormProps) {
       })
 
       // Add notes
-      formData.append("notes", notes)
+      formData.append("instructions", instructions)
 
       const result = await createPrescriptionAction(patient.id, formData)
 
@@ -131,8 +136,149 @@ export function PrescriptionForm({ patient }: PrescriptionFormProps) {
     }
   }
 
+  const handleUploadClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    console.log('📝 Début du traitement du fichier')
+    console.log('📁 Fichier sélectionné:', file.name)
+
+    // Créer une prévisualisation de l'image
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      console.log('🖼️ Prévisualisation créée')
+      setPreviewImage(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+
+    setIsUploading(true)
+    console.log('⏳ Début de l\'upload')
+    
+    try {
+      console.log('📤 Envoi au service OCR')
+      const formData = await prescriptionOCRService.uploadAndExtractPrescription(file)
+      console.log('📥 Données reçues du service:', formData)
+      
+      setExtractedData(formData)
+      console.log('✅ Données extraites mises à jour dans l\'état')
+      
+      toast({
+        title: "Succès",
+        description: "L'ordonnance a été analysée avec succès.",
+      })
+    } catch (error) {
+      console.error('❌ Erreur lors de l\'upload:', error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de traiter l'ordonnance. Veuillez réessayer.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploading(false)
+      console.log('🏁 Fin du processus d\'upload')
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  const handleConfirmUpload = () => {
+    console.log('🔄 Début de la confirmation des données')
+    if (extractedData) {
+      console.log('📋 Données à confirmer:', extractedData)
+      setMedications(extractedData.medications)
+      setInstructions(extractedData.instructions)
+      setPreviewImage(null)
+      setExtractedData(null)
+      console.log('✅ Données confirmées et appliquées au formulaire')
+      toast({
+        title: "Succès",
+        description: "Les données ont été importées dans le formulaire.",
+      })
+    }
+  }
+
+  const handleCancelUpload = () => {
+    setPreviewImage(null)
+    setExtractedData(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-lg font-semibold">Nouvelle Ordonnance</h2>
+          <p className="text-sm text-muted-foreground">
+            Pour {patient.firstName} {patient.lastName}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button 
+            type="button" 
+            variant="outline" 
+            disabled={isUploading}
+            onClick={handleUploadClick}
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            {isUploading ? 'Chargement...' : 'Upload Ordonnance'}
+          </Button>
+          <Input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileUpload}
+            disabled={isUploading}
+          />
+        </div>
+      </div>
+
+      {previewImage && extractedData && (
+        <div className="p-4 border rounded-lg space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="relative w-24 h-24">
+              <Image
+                src={previewImage}
+                alt="Prévisualisation de l'ordonnance"
+                fill
+                className="object-contain rounded"
+              />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-medium mb-2">Données extraites</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                {extractedData.medications.length} médicaments trouvés
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="default"
+                  onClick={handleConfirmUpload}
+                >
+                  <Check className="w-4 h-4 mr-2" />
+                  Confirmer
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCancelUpload}
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Annuler
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Patient Information */}
       <Card>
         <CardHeader>
@@ -174,13 +320,7 @@ export function PrescriptionForm({ patient }: PrescriptionFormProps) {
       {/* Medications */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Médicaments prescrits</CardTitle>
-            <Button type="button" variant="outline" size="sm" onClick={addMedication}>
-              <Plus className="h-4 w-4 mr-2" />
-              Ajouter un médicament
-            </Button>
-          </div>
+          <CardTitle>Médicaments prescrits</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {errors.general && <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{errors.general}</div>}
@@ -190,96 +330,83 @@ export function PrescriptionForm({ patient }: PrescriptionFormProps) {
               <div className="flex items-center justify-between">
                 <h4 className="font-medium">Médicament {index + 1}</h4>
                 {medications.length > 1 && (
-                  <Button type="button" variant="ghost" size="sm" onClick={() => removeMedication(index)}>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveMedication(index)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor={`medication-${index}-name`}>Nom du médicament</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor={`name-${index}`}>Nom</Label>
                   <Input
-                    id={`medication-${index}-name`}
-                    placeholder="Ex: Paracétamol"
+                    id={`name-${index}`}
                     value={medication.name}
-                    onChange={(e) => updateMedication(index, "name", e.target.value)}
+                    onChange={(e) => handleMedicationChange(index, 'name', e.target.value)}
                   />
-                  {errors[`medication-${index}-name`] && (
-                    <p className="text-sm text-red-600">{errors[`medication-${index}-name`]}</p>
-                  )}
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor={`medication-${index}-dosage`}>Dosage</Label>
+                <div>
+                  <Label htmlFor={`dosage-${index}`}>Dosage</Label>
                   <Input
-                    id={`medication-${index}-dosage`}
-                    placeholder="Ex: 500mg"
+                    id={`dosage-${index}`}
                     value={medication.dosage}
-                    onChange={(e) => updateMedication(index, "dosage", e.target.value)}
+                    onChange={(e) => handleMedicationChange(index, 'dosage', e.target.value)}
                   />
-                  {errors[`medication-${index}-dosage`] && (
-                    <p className="text-sm text-red-600">{errors[`medication-${index}-dosage`]}</p>
-                  )}
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor={`medication-${index}-quantity`}>Quantité</Label>
+                <div>
+                  <Label htmlFor={`frequency-${index}`}>Fréquence</Label>
                   <Input
-                    id={`medication-${index}-quantity`}
+                    id={`frequency-${index}`}
+                    value={medication.frequency}
+                    onChange={(e) => handleMedicationChange(index, 'frequency', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`duration-${index}`}>Durée</Label>
+                  <Input
+                    id={`duration-${index}`}
+                    value={medication.duration}
+                    onChange={(e) => handleMedicationChange(index, 'duration', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`quantity-${index}`}>Quantité</Label>
+                  <Input
+                    id={`quantity-${index}`}
                     type="number"
                     min="1"
-                    step="1"
-                    placeholder="Ex: 30"
                     value={medication.quantity}
-                    onChange={(e) => updateMedication(index, "quantity", Number.parseInt(e.target.value) || 1)}
+                    onChange={(e) => handleMedicationChange(index, 'quantity', parseInt(e.target.value) || 1)}
                   />
-                  {errors[`medication-${index}-quantity`] && (
-                    <p className="text-sm text-red-600">{errors[`medication-${index}-quantity`]}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor={`medication-${index}-frequency`}>Fréquence</Label>
-                  <Select
-                    value={medication.frequency}
-                    onValueChange={(value) => updateMedication(index, "frequency", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner la fréquence" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1x/jour">1 fois par jour</SelectItem>
-                      <SelectItem value="2x/jour">2 fois par jour</SelectItem>
-                      <SelectItem value="3x/jour">3 fois par jour</SelectItem>
-                      <SelectItem value="4x/jour">4 fois par jour</SelectItem>
-                      <SelectItem value="au_besoin">Au besoin</SelectItem>
-                      <SelectItem value="autre">Autre</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {errors[`medication-${index}-frequency`] && (
-                    <p className="text-sm text-red-600">{errors[`medication-${index}-frequency`]}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor={`medication-${index}-duration`}>Durée</Label>
-                  <Input
-                    id={`medication-${index}-duration`}
-                    placeholder="Ex: 7 jours"
-                    value={medication.duration}
-                    onChange={(e) => updateMedication(index, "duration", e.target.value)}
-                  />
-                  {errors[`medication-${index}-duration`] && (
-                    <p className="text-sm text-red-600">{errors[`medication-${index}-duration`]}</p>
-                  )}
                 </div>
               </div>
             </div>
           ))}
+
+          <Button type="button" variant="outline" onClick={handleAddMedication}>
+            Ajouter un médicament
+          </Button>
         </CardContent>
       </Card>
 
+      {/* Instructions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Instructions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div>
+            <Label htmlFor="instructions">Instructions Générales</Label>
+            <Textarea
+              id="instructions"
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              placeholder="Instructions générales pour le patient..."
+              className="mt-1"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Form Actions */}
       <div className="flex items-center justify-end space-x-4">
