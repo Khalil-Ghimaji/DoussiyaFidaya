@@ -1,7 +1,6 @@
 'use server'
 
 import { revalidateTag } from 'next/cache'
-import { redirect } from 'next/navigation'
 import { sendGraphQLMutation } from '@/lib/graphql-client'
 import { createPrescription } from '../prescription/actions'
 import { cookies } from 'next/headers'

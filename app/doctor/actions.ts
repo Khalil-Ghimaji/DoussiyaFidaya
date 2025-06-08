@@ -576,6 +576,7 @@ export async function createAppointment(data: any) {
         id: string;
       };
     }
+    console.log("Creating appointment with data:", data)
 
     const result = await sendGraphQLMutation<CreateAppointmentResponse>(
         `mutation CreateAppointment($data: RdvsCreateInput!) {

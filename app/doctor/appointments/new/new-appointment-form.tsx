@@ -129,7 +129,7 @@ export function NewAppointmentForm({ patients }: { patients: Patient[] }) {
       formDataToSubmit.append("type", formData.type)
       formDataToSubmit.append("reason", formData.reason)
       formDataToSubmit.append("notes", formData.notes)
-
+      console.log("Submitting form data:", formDataToSubmit)
       const result = await createAppointment(formDataToSubmit)
 
       if (result.id) {

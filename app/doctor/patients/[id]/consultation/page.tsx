@@ -6,9 +6,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
 import { PatientConsultationForm } from "./patient-consultation-form"
 import { fetchGraphQL } from "@/lib/graphql-client"
-import { GET_PATIENT_EXTENDED, GET_PATIENT_INFO } from "@/lib/graphql/queriesV2/patient"
+import { GET_PATIENT_EXTENDED } from "@/lib/graphql/queriesV2/patient"
 import { PatientExtended ,adaptToPatient } from "@/lib/graphql/types/patient"
-
 
 async function getPatientDetails(id: string): Promise<PatientExtended | null> {
   try {
