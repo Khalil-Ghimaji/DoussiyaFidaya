@@ -1,11 +1,11 @@
 import { io, type Socket } from "socket.io-client"
 import { fetchGraphQL } from "@/lib/graphql-client"
-import {
-    Patient,
-    Doctor,
-    Message,
-    Conversation,
-    PatientOld,
+import { 
+    Patient, 
+    Doctor, 
+    Message, 
+    Conversation, 
+    PatientOld, 
     DoctorOld,
     SendMessageData,
     Users
@@ -19,6 +19,7 @@ export class ChatService {
     private serverUrl = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || "http://localhost:4000"
     private typingTimeouts: Map<string, NodeJS.Timeout> = new Map()
 
+    // Event callbacks
     onConnectionChange?: (connected: boolean) => void
     onUserInfo?: (user: Doctor) => void
     onConversationsUpdate?: (conversations: Conversation[]) => void
@@ -32,9 +33,11 @@ export class ChatService {
         try {
             console.log("🔌 Connexion WebSocket vers:", this.serverUrl)
 
+            // Récupérer le token depuis les cookies
             const token = await this.getTokenFromCookie()
             console.log("🔑 Token disponible:", token ? "✅" : "❌")
 
+            // Configuration des options de socket
             const socketOptions: any = {
                 withCredentials: true,
                 transports: ["websocket", "polling"],
@@ -44,13 +47,16 @@ export class ChatService {
                 timeout: 10000,
             }
 
+            // Ajouter le token dans l'authentification si disponible
             if (token) {
                 socketOptions.auth = { token }
             }
 
+            // Initialiser la connexion socket
             this.socket = io(this.serverUrl, socketOptions)
             this.setupSocketEvents()
 
+            // Retourner une promesse qui se résout une fois la connexion établie
             return new Promise((resolve, reject) => {
                 const timeoutId = setTimeout(() => {
                     reject(new Error("Connection timeout after 10 seconds"))
@@ -144,6 +150,7 @@ export class ChatService {
             this.onNewMessage?.(message)
         })
 
+        // Fixed: Handle different possible event names for message read
         this.socket.on("messageRead", (data) => {
             console.log("👁️ Message lu (messageRead):", data)
             this.onMessageRead?.(data)
@@ -154,6 +161,7 @@ export class ChatService {
             this.onMessageRead?.(data)
         })
 
+        // Also listen for bulk read updates
         this.socket.on("messagesMarkedAsRead", (data) => {
             console.log("👁️ Messages marqués comme lus:", data)
             // Handle bulk read if your backend supports it
@@ -169,6 +177,7 @@ export class ChatService {
             this.onMessageDeleted?.(data)
         })
 
+        // Fixed: Enhanced typing event handling
         this.socket.on("typing", (data) => {
             console.log("⌨️ Typing reçu:", data)
             this.onTypingChange?.(data.isTyping, data.doctorId || data.senderId, data.patientId)
@@ -198,11 +207,13 @@ export class ChatService {
             console.log("🔍 Résultat existence conversation:", data)
         })
 
+        // Add error handling for socket events
         this.socket.on("error", (error) => {
             console.error("🚨 Socket error:", error)
         })
     }
 
+    // REST API Methods
     private async fetchApi(endpoint: string, options: RequestInit = {}): Promise<any> {
         const token = await this.getTokenFromCookie()
         if (!token) {
@@ -230,6 +241,7 @@ export class ChatService {
         return response.json()
     }
 
+    // Conversations methods
     async loadConversations(): Promise<void> {
         try {
             console.log("🔄 Chargement des conversations...")
@@ -376,6 +388,7 @@ export class ChatService {
         }
     }
 
+    // Fixed: Enhanced markMessageAsRead with better error handling and multiple approaches
     async markMessageAsRead(messageId: string, patientId: string, receiverId?: string): Promise<void> {
         try {
             console.log("👁️ Marquage message comme lu:", { messageId, patientId, receiverId })
@@ -435,6 +448,7 @@ export class ChatService {
         }
     }
 
+    // Enhanced: Mark multiple messages as read
     async markConversationAsRead(patientId: string, receiverId: string): Promise<void> {
         try {
             console.log("👁️ Marquage conversation comme lue:", { patientId, receiverId })
@@ -456,18 +470,21 @@ export class ChatService {
         }
     }
 
+    // Fixed: Enhanced typing indicators with automatic cleanup
     startTyping(receiverId: string, patientId: string): void {
         if (this.socket && this.socket.connected) {
             const typingKey = `${receiverId}-${patientId}`
 
             console.log("⌨️ Début typing:", { receiverId, patientId })
 
+            // Send typing start event
             this.socket.emit("startTyping", {
                 receiverId,
                 patientId,
                 senderId: this.currentUser?.id
             })
 
+            // Alternative event name
             this.socket.emit("typing", {
                 receiverId,
                 patientId,
@@ -481,6 +498,7 @@ export class ChatService {
                 clearTimeout(existingTimeout)
             }
 
+            // Auto-stop typing after 3 seconds of inactivity
             const timeout = setTimeout(() => {
                 this.stopTyping(receiverId, patientId)
             }, 3000)
@@ -539,61 +557,97 @@ export class ChatService {
     // GraphQL methods for patients and doctors
     async getDoctorPatients(doctorId: string): Promise<Patient[]> {
         try {
-            console.log("👥 Chargement des patients du docteur:", doctorId)
-
-            if (this.socket && this.socket.connected) {
-                return new Promise((resolve, reject) => {
-                    const timeoutId = setTimeout(() => {
-                        reject(new Error("Timeout waiting for doctor patients"))
-                    }, 10000)
-
-                    const handler = (data: { docPatients: PatientOld[] }) => {
-                        clearTimeout(timeoutId)
-                        this.socket?.off("getDocPatients", handler)
-                        const adaptedPatients = data.docPatients.map(this.adaptPatient)
-                        resolve(adaptedPatients)
-                    }
-
-                    this.socket?.on("getDocPatients", handler)
-                    this.socket?.emit("getDocPatients", { doctorId })
-                })
-            } else {
-                const response = await this.fetchApi(`/chat/doctor/${doctorId}/patients`) as { docPatients: PatientOld[] }
-                return response.docPatients.map(this.adaptPatient)
+            const query = `
+        query GetDoctorPatients($docId: String!, $take: Int, $skip: Int) {
+          docPatients: findManyConsultations(
+            where: { 
+              doctor_id: { equals: $docId }
             }
+            orderBy: { date: desc }
+            take: $take
+            skip: $skip
+            distinct: [patient_id]
+          ) {
+            date
+            patient_id
+            patients {
+              users {
+                first_name
+                last_name
+              }
+              gender
+            }
+          }
+        }
+      `
+
+            const response = await fetchGraphQL(query, {
+                docId: doctorId,
+                take: 100,
+                skip: 0,
+            })
+
+            if (!response?.data?.docPatients) {
+                return []
+            }
+
+            return response.data.docPatients.map((consultation: any) => ({
+                id: consultation.patient_id,
+                name: `${consultation.patients.users.first_name} ${consultation.patients.users.last_name}`,
+                firstName: consultation.patients.users.first_name,
+                lastName: consultation.patients.users.last_name,
+                gender: consultation.patients.gender,
+            }))
         } catch (error) {
-            console.error("💥 Échec chargement patients docteur:", error)
-            throw error
+            console.error("Failed to get doctor patients:", error)
+            return []
         }
     }
 
     async getPatientDoctors(patientId: string): Promise<Doctor[]> {
         try {
-            console.log("👥 Chargement des docteurs du patient:", patientId)
-
-            if (this.socket && this.socket.connected) {
-                return new Promise((resolve, reject) => {
-                    const timeoutId = setTimeout(() => {
-                        reject(new Error("Timeout waiting for patient doctors"))
-                    }, 10000)
-
-                    const handler = (data: { docPatients: DoctorOld[] }) => {
-                        clearTimeout(timeoutId)
-                        this.socket?.off("getPatientDoctors", handler)
-                        const adaptedDoctors = data.docPatients.map(this.adaptDoctor)
-                        resolve(adaptedDoctors)
-                    }
-
-                    this.socket?.on("getPatientDoctors", handler)
-                    this.socket?.emit("getPatientDoctors", { patientId })
-                })
-            } else {
-                const response = await this.fetchApi(`/chat/patient/${patientId}/doctors`) as { docPatients: DoctorOld[] }
-                return response.docPatients.map(this.adaptDoctor)
+            const query = `
+        query GetPatientDoctors($patientId: String!, $take: Int, $skip: Int) {
+          docPatients: findManyConsultations(
+            where: { 
+              patient_id: { equals: $patientId }
             }
+            orderBy: { date: desc }
+            take: $take
+            skip: $skip
+            distinct: [doctor_id]
+          ) {
+            date
+            doctor_id
+            doctors {
+              users {
+                first_name
+                last_name
+              }
+            }
+          }
+        }
+      `
+
+            const response = await fetchGraphQL(query, {
+                patientId: patientId,
+                take: 100,
+                skip: 0,
+            })
+
+            if (!response?.data?.docPatients) {
+                return []
+            }
+
+            return response.data.docPatients.map((consultation: any) => ({
+                id: consultation.doctor_id,
+                firstName: consultation.doctors.users.first_name,
+                lastName: consultation.doctors.users.last_name,
+                specialty: "Doctor",
+            }))
         } catch (error) {
-            console.error("💥 Échec chargement docteurs patient:", error)
-            throw error
+            console.error("Failed to get patient doctors:", error)
+            return []
         }
     }
 

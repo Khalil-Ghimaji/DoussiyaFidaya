@@ -24,13 +24,13 @@ import {
 } from "lucide-react";
 import { ChatService } from "./services/chat-service";
 import { getInitials } from "@/lib/utils";
-import {
-    Patient,
-    Doctor,
-    Message,
-    Conversation,
-    PatientOld,
-    DoctorOld
+import { 
+    Patient, 
+    Doctor, 
+    Message, 
+    Conversation, 
+    PatientOld, 
+    DoctorOld 
 } from "./types";
 
 interface MessagingInterfaceProps {
@@ -38,7 +38,6 @@ interface MessagingInterfaceProps {
 }
 
 export function MessagingInterface({ initialConversations }: MessagingInterfaceProps) {
-    // State
     const [isConnected, setIsConnected] = useState(false);
     const [currentUser, setCurrentUser] = useState<Doctor | null>(null);
     const [conversations, setConversations] = useState<Conversation[]>(initialConversations || []);
@@ -58,11 +57,13 @@ export function MessagingInterface({ initialConversations }: MessagingInterfaceP
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Refs
     const chatService = useRef<ChatService | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+    // Transform PatientOld to Patient
     const adaptPatient = (old: PatientOld): Patient => ({
         id: old.id,
         cin: 0,

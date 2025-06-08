@@ -1,7 +1,11 @@
+// page.tsx
 import { headers } from "next/headers";
-
-import { MessagingInterface } from "./messaging-interface";
+// Remove GraphQL related imports if no longer used in this file
+// import { executeGraphQLServer } from "@/lib/graphql-server";
+// import { GET_DOCTOR_MESSAGES } from "@/lib/graphql/doctor-queries";
+import { MessagingInterface } from "./messaging-interface"; //
 import type { Conversation as FrontendConversation } from "./messaging-interface";
+
 
 
 async function getInitialConversations(): Promise<FrontendConversation[]> {
@@ -10,6 +14,7 @@ async function getInitialConversations(): Promise<FrontendConversation[]> {
         const cookieString = headerStore.get("cookie") || "";
         const cookies = cookieString.split(";").map((cookie) => cookie.trim());
 
+        // Look for associatedId cookie
         const associatedIdCookie = cookies.find((cookie) =>
             cookie.startsWith("associatedId="),
         );
@@ -21,7 +26,9 @@ async function getInitialConversations(): Promise<FrontendConversation[]> {
         const associatedId = associatedIdCookie.substring(associatedIdCookie.indexOf("=") + 1);
         console.log("👤 AssociatedId trouvé pour getInitialConversations:", associatedId);
 
-
+        // Look for auth token cookie (adjust cookie name if necessary)
+        // Common names: 'token', 'auth_token', 'jwt', 'access_token'
+        // This needs to match the cookie name your authentication system sets.
         const tokenCookieNames = ["token", "authToken", "auth_token", "jwt", "access_token"];
         let authToken = null;
 
@@ -36,7 +43,7 @@ async function getInitialConversations(): Promise<FrontendConversation[]> {
                 try {
                     authToken = decodeURIComponent(authToken);
                 } catch (e) {
-
+                    // If decoding fails, use the raw token
                 }
                 break;
             }
@@ -44,6 +51,8 @@ async function getInitialConversations(): Promise<FrontendConversation[]> {
 
         if (!authToken) {
             console.error("❌ Aucun token d'authentification trouvé dans les cookies pour getInitialConversations");
+            // Depending on your app's logic, you might want to throw an error or handle this differently.
+            // For now, returning empty to prevent full page crash, but auth should ideally be handled by middleware.
             return [];
         }
 
@@ -54,7 +63,7 @@ async function getInitialConversations(): Promise<FrontendConversation[]> {
                 "Authorization": `Bearer ${authToken}`,
                 "Content-Type": "application/json",
             },
-            cache: "no-store",
+            cache: "no-store", // Fetch fresh data on every request
         });
 
         if (!response.ok) {
@@ -66,6 +75,7 @@ async function getInitialConversations(): Promise<FrontendConversation[]> {
         const data = await response.json();
         console.log("haw lenaaaaa\n",data,"\njjjjjj")
 
+        // The API returns { conversations: [...] }, we need the array.
         return data.conversations || [];
     } catch (error) {
         console.error("Erreur lors de la récupération des conversations initiales:", error);
@@ -78,6 +88,7 @@ export default async function MessagesPage() {
 
     return (
         <div className="h-screen">
+            {/* Pass initialConversations instead of initialMessages */}
             <MessagingInterface initialConversations={initialConversations} />
         </div>
     );
