@@ -3,39 +3,51 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { getClient } from "@/lib/apollo-client-server"
-import { CREATE_ANALYSIS, UPLOAD_ANALYSIS_RESULTS, UPDATE_ANALYSIS_STATUS } from "@/lib/graphql/mutations/laboratory"
-
+import { UPLOAD_ANALYSIS_RESULTS, UPDATE_ANALYSIS_STATUS } from "@/lib/graphql/mutations/laboratory"
+import { CREATE_LAB_DOCUMENT, CREATE_LAB_REQUEST } from "@/lib/graphql/mutationsV2/laboratory"
+import { getApolloServerClient } from "@/lib/apollo-server-client"
+import { sendGraphQLMutation } from "@/lib/graphql-client"
+type CreateLabRequestResponse = {
+  createOneLab_requests: {
+    id: string;
+    patient_id: string;
+    type: string;
+    description: string;
+    priority: string;
+  };
+};
 export async function createAnalysis(formData: FormData) {
-  try {
-    const patientId = formData.get("patientId") as string
-    const analysisTypeId = formData.get("analysisTypeId") as string
-    const priority = formData.get("priority") as string
-    const notes = formData.get("notes") as string
+  const patientId = formData.get("patientId") as string
+  const analysisType = formData.get("analysisType") as string
+  const priority = formData.get("priority") as string
+  const notes = formData.get("notes") as string
+  const labId  = "e98c8e51-e285-418c-865a-2dde9bd30cc9" as string // Assuming this is a static lab ID for now
 
-    const { data } = await getClient().mutate({
-      mutation: CREATE_ANALYSIS,
-      variables: {
-        input: {
-          patientId,
-          analysisTypeId,
-          priority,
-          notes,
-        },
-      },
-    })
+  const { data: labRequestData } = await sendGraphQLMutation<CreateLabRequestResponse>(CREATE_LAB_REQUEST, {
+  patientId,
+  type: analysisType,
+  description: notes,
+  priority,
+});
+const labReqId = labRequestData.createOneLab_requests.id as string; // Extracting the lab request ID
+// 2. Create Lab Document referencing the lab request
+const { data: labDocumentData } = await sendGraphQLMutation(CREATE_LAB_DOCUMENT, {
+  patientId,
+  labRequestId: labReqId,
+  labId: labId,
+  requestedAt: new Date().toISOString(),
+  status: 'pending',
+});
 
-    revalidatePath("/laboratory/pending")
+  revalidatePath("/laboratory/pending")
 
-    if (patientId) {
-      revalidatePath(`/laboratory/patients/${patientId}/history`)
-      return redirect(`/laboratory/patients/${patientId}/history`)
-    }
-
-    return { success: true, data: data.createAnalysis }
-  } catch (error) {
-    console.error("Error creating analysis:", error)
-    return { success: false, error: "Failed to create analysis. Please try again." }
+  if (patientId) {
+    revalidatePath(`/laboratory/patients/${patientId}/history`)
+    redirect(`/laboratory/patients/${patientId}/history`)
   }
+
+  // If no redirect, return success
+  return { success: true, labDocumentData }
 }
 
 export async function uploadAnalysisResults(formData: FormData) {

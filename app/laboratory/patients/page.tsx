@@ -1,12 +1,13 @@
 import { Suspense } from "react"
 import Link from "next/link"
-import { getClient } from "@/lib/apollo-client-server"
-import { GET_LABORATORY_PATIENTS } from "@/lib/graphql/queries/laboratory"
+import { fetchGraphQL } from "@/lib/graphql-client" // Adjust import path as needed
+import { GET_LABORATORY_PATIENTS } from "@/lib/graphql/queriesV2/laboratory"
 import { TableSkeleton } from "@/components/laboratory/table-skeleton"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Search, Plus } from "lucide-react"
+import { cookies } from "next/headers"
 
 // This page uses dynamic rendering for fresh data
 export const dynamic = "force-dynamic"
@@ -16,21 +17,16 @@ async function PatientsTable({ searchParams }: { searchParams: { search?: string
   const search = searchParams.search || ""
   const page = Number.parseInt(searchParams.page || "1")
   const limit = 10
+  const storedSession = await cookies();
+  const labId = storedSession.get("associatedId")?.value; // Replace with dynamic lab ID if needed
 
-  const { data, error } = await getClient().query({
-    query: GET_LABORATORY_PATIENTS,
-    variables: {
-      search,
-      page,
-      limit,
-    },
+  const { data } = await fetchGraphQL<any>(GET_LABORATORY_PATIENTS, { 
+    labId,
+    take: limit,
+    skip: (page - 1) * limit
   })
 
-  if (error) {
-    throw new Error("Failed to fetch patients")
-  }
-
-  const { patients, pagination } = data.laboratoryPatients
+  const patients = data?.uniquePatients || []
 
   return (
     <div className="space-y-4">
@@ -60,10 +56,8 @@ async function PatientsTable({ searchParams }: { searchParams: { search?: string
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Document ID</TableHead>
               <TableHead>Date of Birth</TableHead>
               <TableHead>Gender</TableHead>
-              <TableHead>Last Analysis</TableHead>
               <TableHead>Total Analyses</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
@@ -71,14 +65,14 @@ async function PatientsTable({ searchParams }: { searchParams: { search?: string
           <TableBody>
             {patients.map((patient: any) => (
               <TableRow key={patient.id}>
-                <TableCell className="font-medium">{patient.name}</TableCell>
-                <TableCell>{patient.documentId}</TableCell>
-                <TableCell>{new Date(patient.dateOfBirth).toLocaleDateString()}</TableCell>
-                <TableCell>{patient.gender}</TableCell>
-                <TableCell>
-                  {patient.lastAnalysisDate ? new Date(patient.lastAnalysisDate).toLocaleDateString() : "N/A"}
+                <TableCell className="font-medium">
+                  {patient.users.first_name} {patient.users.last_name}
                 </TableCell>
-                <TableCell>{patient.totalAnalyses}</TableCell>
+                <TableCell>
+                  {new Date(patient.date_of_birth).toLocaleDateString()}
+                </TableCell>
+                <TableCell>{patient.gender}</TableCell>
+                <TableCell>{patient._count?.lab_documents || 0}</TableCell>
                 <TableCell>
                   <div className="flex space-x-2">
                     <Link href={`/laboratory/patients/${patient.id}/history`}>
@@ -99,9 +93,6 @@ async function PatientsTable({ searchParams }: { searchParams: { search?: string
 
       {/* Pagination */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          Showing {(page - 1) * limit + 1} to {Math.min(page * limit, pagination.total)} of {pagination.total} patients
-        </p>
         <div className="flex space-x-2">
           <Link href={`/laboratory/patients?page=${page - 1}${search ? `&search=${search}` : ""}`}>
             <Button variant="outline" size="sm" disabled={page <= 1}>
@@ -109,7 +100,7 @@ async function PatientsTable({ searchParams }: { searchParams: { search?: string
             </Button>
           </Link>
           <Link href={`/laboratory/patients?page=${page + 1}${search ? `&search=${search}` : ""}`}>
-            <Button variant="outline" size="sm" disabled={!pagination.hasMore}>
+            <Button variant="outline" size="sm" >
               Next
             </Button>
           </Link>
@@ -127,10 +118,9 @@ export default function PatientsPage({ searchParams }: { searchParams: { search?
         <p className="text-muted-foreground">Manage patient records and request new analyses</p>
       </div>
 
-      <Suspense fallback={<TableSkeleton columns={7} rows={10} />}>
+      <Suspense fallback={<TableSkeleton columns={5} rows={10} />}>
         <PatientsTable searchParams={searchParams} />
       </Suspense>
     </div>
   )
 }
-

@@ -1,160 +1,171 @@
 import { Suspense } from "react"
 import Link from "next/link"
-import { notFound } from "next/navigation"
-import { getClient } from "@/lib/apollo-client-server"
-import { GET_PATIENT_ANALYSIS_HISTORY } from "@/lib/graphql/queries/laboratory"
 import { TableSkeleton } from "@/components/laboratory/table-skeleton"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Plus, ArrowLeft } from "lucide-react"
+import { Search } from "lucide-react"
+import { fetchGraphQL } from "@/lib/graphql-client"
+import { GET_PATIENT_INFO } from "@/lib/graphql/queriesV2/patient"
+import { GET_LABORATORY_PATIENT_ANALYSES } from "@/lib/graphql/queriesV2/laboratory"
+import { cookies } from "next/headers"
 
-// This page uses ISR with revalidation every 5 minutes
-export const revalidate = 300 // 5 minutes
+export const dynamic = "force-dynamic"
 
-async function PatientHistoryContent({ id, searchParams }: { id: string; searchParams: { page?: string } }) {
-  const page = Number.parseInt(searchParams.page || "1")
+
+async function PatientAnalysesTable({ 
+  id,
+  searchParams 
+}: { 
+  id: string
+  searchParams: { page?: string } 
+}) {
+  // Ensure page is parsed safely
+  const page = Number(searchParams?.page) || 1
   const limit = 10
+  const storedSession = await cookies();
+  const labId = storedSession.get("associatedId")?.value;// Replace with dynamic lab ID if needed
 
-  const { data, error } = await getClient().query({
-    query: GET_PATIENT_ANALYSIS_HISTORY,
-    variables: {
-      patientId: id,
-      page,
-      limit,
-    },
-  })
+  try {
+    // Fetch patient info and analyses in parallel
+    const [patientData, analysesData] = await Promise.all([
+      fetchGraphQL<any>(GET_PATIENT_INFO, { patientId: id }),
+      fetchGraphQL<any>(GET_LABORATORY_PATIENT_ANALYSES, { 
+        labId,
+        patientId: id,
+        take: limit,
+        skip: (page - 1) * limit
+      })
+    ])
 
-  if (error || !data.patientAnalysisHistory) {
-    notFound()
-  }
+    const patient = patientData.data?.patient
+    const analyses = analysesData.data?.analyses || []
 
-  const { patient, analyses, pagination } = data.patientAnalysisHistory
+    if (!patient) {
+      throw new Error("Failed to fetch patient information")
+    }
 
-  return (
-    <>
-      <div className="mb-6">
-        <Link href="/laboratory/patients">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Patients
-          </Button>
-        </Link>
-      </div>
-
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Patient Information</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    return (
+      <div className="space-y-6">
+        {/* Patient Info Section */}
+        <div className="rounded-lg border p-4">
+          <h2 className="text-xl font-semibold mb-2">Patient Information</h2>
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Name</p>
-              <p>{patient.name}</p>
+              <p className="text-sm text-muted-foreground">Name</p>
+              <p>{patient.users.first_name} {patient.users.last_name}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Document ID</p>
-              <p>{patient.documentId}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Date of Birth</p>
-              <p>{new Date(patient.dateOfBirth).toLocaleDateString()}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Gender</p>
+              <p className="text-sm text-muted-foreground">Gender</p>
               <p>{patient.gender}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Contact Number</p>
-              <p>{patient.contactNumber}</p>
+              <p className="text-sm text-muted-foreground">Date of Birth</p>
+              <p>{new Date(patient.date_of_birth).toLocaleDateString()}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Email</p>
-              <p>{patient.email}</p>
+              <p className="text-sm text-muted-foreground">Contact</p>
+              <p>{patient.users.email}</p>
+              {patient.users.phone && <p>{patient.users.phone}</p>}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">Analysis History</h2>
-        <Link href={`/laboratory/patients/${id}/new-analysis`}>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Analysis
-          </Button>
-        </Link>
-      </div>
+        {/* Analyses Table Section */}
+        <div className="space-y-4">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search analyses..."
+              className="pl-8"
+            />
+          </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Type</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Requested By</TableHead>
-              <TableHead>Requested Date</TableHead>
-              <TableHead>Completed Date</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {analyses.map((analysis: any) => (
-              <TableRow key={analysis.id}>
-                <TableCell>{analysis.type}</TableCell>
-                <TableCell>
-                  <Badge variant={analysis.status === "COMPLETED" ? "success" : "warning"}>{analysis.status}</Badge>
-                </TableCell>
-                <TableCell>{analysis.requestedBy.name}</TableCell>
-                <TableCell>{new Date(analysis.requestedAt).toLocaleDateString()}</TableCell>
-                <TableCell>
-                  {analysis.completedAt ? new Date(analysis.completedAt).toLocaleDateString() : "N/A"}
-                </TableCell>
-                <TableCell>
-                  {analysis.status === "COMPLETED" ? (
-                    <Link href={`/laboratory/results/${analysis.id}`}>
-                      <Button variant="outline" size="sm">
-                        View Results
-                      </Button>
-                    </Link>
-                  ) : (
-                    <Link href={`/laboratory/upload?analysisId=${analysis.id}`}>
-                      <Button size="sm">Upload Results</Button>
-                    </Link>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Priority</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Requested Date</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {analyses.map((analysis: any) => (
+                  <TableRow key={analysis.id}>
+                    <TableCell>{analysis?.lab_requests?.type}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          analysis.lab_requests?.priority === "high"
+                            ? "destructive"
+                            : analysis.lab_requests?.priority === "medium"
+                              ? "warning"
+                              : "outline"
+                        }
+                      >
+                        {analysis.lab_requests?.priority || "low"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={analysis.status === "completed" ? "default" : "secondary"}>
+                        {analysis.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {new Date(analysis.requested_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      {analysis.status === "pending" && (
+                        <Link href={`/laboratory/upload?analysisId=${analysis.id}`}>
+                          <Button size="sm">Upload Results</Button>
+                        </Link>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
 
-      {/* Pagination */}
-      <div className="flex items-center justify-between mt-4">
-        <p className="text-sm text-muted-foreground">
-          Showing {(page - 1) * limit + 1} to {Math.min(page * limit, pagination.total)} of {pagination.total} analyses
-        </p>
-        <div className="flex space-x-2">
-          <Link href={`/laboratory/patients/${id}/history?page=${page - 1}`}>
-            <Button variant="outline" size="sm" disabled={page <= 1}>
-              Previous
-            </Button>
-          </Link>
-          <Link href={`/laboratory/patients/${id}/history?page=${page + 1}`}>
-            <Button variant="outline" size="sm" disabled={!pagination.hasMore}>
-              Next
-            </Button>
-          </Link>
+          {/* Pagination */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Showing {(page - 1) * limit + 1} to {Math.min(page * limit, analyses.length)} of {analyses.length} analyses
+            </p>
+            <div className="flex space-x-2">
+              <Link href={`/laboratory/patients/${id}/history?page=${page - 1}`}>
+                <Button variant="outline" size="sm" disabled={page <= 1}>
+                  Previous
+                </Button>
+              </Link>
+              <Link href={`/laboratory/patients/${id}/history?page=${page + 1}`}>
+                <Button variant="outline" size="sm" disabled={analyses.length < limit}>
+                  Next
+                </Button>
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
-    </>
-  )
+    )
+  } catch (error) {
+    console.error("Error fetching data:", error)
+    return (
+      <div className="text-center py-8">
+        <p className="text-red-500">Failed to load patient data. Please try again later.</p>
+      </div>
+    )
+  }
 }
 
-export default function PatientHistoryPage({
+export default function PatientAnalysisPage({
   params,
-  searchParams,
+  searchParams
 }: {
   params: { id: string }
   searchParams: { page?: string }
@@ -163,13 +174,15 @@ export default function PatientHistoryPage({
     <div className="container mx-auto py-6">
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Patient Analysis History</h1>
-        <p className="text-muted-foreground">View and manage patient's laboratory analyses</p>
+        <p className="text-muted-foreground">View and manage patient laboratory analyses</p>
       </div>
 
-      <Suspense fallback={<TableSkeleton columns={6} rows={10} />}>
-        <PatientHistoryContent id={params.id} searchParams={searchParams} />
+      <Suspense fallback={<TableSkeleton columns={5} rows={10} />}>
+        <PatientAnalysesTable 
+          id={params.id}
+          searchParams={searchParams}
+        />
       </Suspense>
     </div>
   )
 }
-
