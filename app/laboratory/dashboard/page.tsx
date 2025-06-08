@@ -1,24 +1,42 @@
 import { Suspense } from "react"
-import { getClient } from "@/lib/apollo-client-server"
-import { GET_LABORATORY_DASHBOARD } from "@/lib/graphql/queries/laboratory"
+import { fetchGraphQL } from "@/lib/graphql-client"
+import { GET_LABORATORY_DASHBOARD } from "@/lib/graphql/queriesV2/laboratory"
 import { DashboardSkeleton } from "@/components/laboratory/dashboard-skeleton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Activity, ClipboardList, Clock, CheckCircle } from "lucide-react"
 import { BarChart } from "@/components/charts/bar-chart"
+import { cookies } from "next/headers"
 
 // This page uses SSR with revalidation every 60 seconds
 export const revalidate = 60
 
 async function LaboratoryDashboardContent() {
-  const { data, error } = await getClient().query({
-    query: GET_LABORATORY_DASHBOARD,
-  })
+  const storedSession = await cookies();
+  const labId = storedSession.get("associatedId")?.value;
 
-  if (error) {
-    throw new Error("Failed to fetch laboratory dashboard data")
+  const { data } = await fetchGraphQL<any>(GET_LABORATORY_DASHBOARD, { labId })
+
+  const {
+    totalAnalyses,
+    pendingAnalyses,
+    completedAnalyses,
+    recentAnalyses,
+    analyticsData
+  } = data
+
+  const totalCount = totalAnalyses._count._all
+  const pendingCount = pendingAnalyses._count._all
+  const completedCount = completedAnalyses._count._all
+
+  const barChartData = {
+    labels: analyticsData.map((entry: any) => entry.status),
+    datasets: [
+      {
+        label: "Analyses",
+        data: analyticsData.map((entry: any) => entry._count._all),
+      },
+    ],
   }
-
-  const { totalAnalyses, pendingAnalyses, completedAnalyses, recentAnalyses, analyticsData } = data.laboratoryDashboard
 
   return (
     <div className="space-y-6">
@@ -29,30 +47,33 @@ async function LaboratoryDashboardContent() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalAnalyses}</div>
+            <div className="text-2xl font-bold">{totalCount}</div>
             <p className="text-xs text-muted-foreground">All time analyses</p>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Pending Analyses</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{pendingAnalyses}</div>
+            <div className="text-2xl font-bold">{pendingCount}</div>
             <p className="text-xs text-muted-foreground">Awaiting results</p>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Completed Analyses</CardTitle>
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{completedAnalyses}</div>
+            <div className="text-2xl font-bold">{completedCount}</div>
             <p className="text-xs text-muted-foreground">Results available</p>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
@@ -60,7 +81,7 @@ async function LaboratoryDashboardContent() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {totalAnalyses > 0 ? `${Math.round((completedAnalyses / totalAnalyses) * 100)}%` : "0%"}
+              {totalCount > 0 ? `${Math.round((completedCount / totalCount) * 100)}%` : "0%"}
             </div>
             <p className="text-xs text-muted-foreground">Last 30 days</p>
           </CardContent>
@@ -73,17 +94,10 @@ async function LaboratoryDashboardContent() {
             <CardTitle>Analysis Trends</CardTitle>
           </CardHeader>
           <CardContent>
-            <BarChart
-              data={{
-                labels: analyticsData.labels,
-                datasets: analyticsData.datasets.map((dataset: any) => ({
-                  label: dataset.label,
-                  data: dataset.data,
-                })),
-              }}
-            />
+            <BarChart data={barChartData} />
           </CardContent>
         </Card>
+
         <Card className="col-span-3">
           <CardHeader>
             <CardTitle>Recent Analyses</CardTitle>
@@ -94,12 +108,14 @@ async function LaboratoryDashboardContent() {
                 <div key={analysis.id} className="flex items-center">
                   <div
                     className={`h-2 w-2 rounded-full ${
-                      analysis.status === "COMPLETED" ? "bg-green-500" : "bg-amber-500"
+                      analysis.status === "completed" ? "bg-green-500" : "bg-amber-500"
                     }`}
                   />
                   <div className="ml-4 space-y-1">
-                    <p className="text-sm font-medium">{analysis.patientName}</p>
-                    <p className="text-sm text-muted-foreground">{analysis.type}</p>
+                    <p className="text-sm font-medium">
+                      {analysis.patients?.users?.first_name} {analysis.patients?.users?.last_name}
+                    </p>
+                    <p className="text-sm text-muted-foreground">{analysis.lab_requests?.type}</p>
                   </div>
                   <div className="ml-auto text-sm text-muted-foreground">
                     {new Date(analysis.requestedAt).toLocaleDateString()}
@@ -128,4 +144,3 @@ export default function LaboratoryDashboardPage() {
     </div>
   )
 }
-

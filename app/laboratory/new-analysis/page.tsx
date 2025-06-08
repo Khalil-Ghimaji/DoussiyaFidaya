@@ -14,15 +14,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 export const revalidate = 86400 // 24 hours
 
 async function NewAnalysisForm() {
-  const { data, error } = await getClient().query({
-    query: GET_ANALYSIS_TYPES,
-  })
-
-  if (error) {
-    throw new Error("Failed to fetch analysis types")
-  }
-
-  const { analysisTypes } = data
 
   return (
     <Card>
@@ -37,19 +28,14 @@ async function NewAnalysisForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="analysisTypeId">Analysis Type</Label>
-            <Select name="analysisTypeId" required>
-              <SelectTrigger>
-                <SelectValue placeholder="Select analysis type" />
-              </SelectTrigger>
-              <SelectContent>
-                {analysisTypes.map((type: any) => (
-                  <SelectItem key={type.id} value={type.id}>
-                    {type.name} - {type.category}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="analysisType">Analysis Type</Label>
+            <Input 
+              id="analysisType"
+              name="analysisType" 
+              type="text" 
+              placeholder="Enter analysis type" 
+              required 
+            />
           </div>
 
           <div className="space-y-2">
@@ -59,10 +45,9 @@ async function NewAnalysisForm() {
                 <SelectValue placeholder="Select priority" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="LOW">Low</SelectItem>
-                <SelectItem value="NORMAL">Normal</SelectItem>
-                <SelectItem value="HIGH">High</SelectItem>
-                <SelectItem value="URGENT">Urgent</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="medium">Normal</SelectItem>
+                <SelectItem value="high">High</SelectItem>
               </SelectContent>
             </Select>
           </div>
