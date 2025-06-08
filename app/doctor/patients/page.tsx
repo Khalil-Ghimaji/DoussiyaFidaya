@@ -1,5 +1,5 @@
 import { Suspense } from "react"
-import { Loader2, Plus } from "lucide-react"
+import { ArrowLeft, Loader2, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { executeGraphQLServer } from "@/lib/graphql-server"
@@ -97,17 +97,21 @@ export default async function PatientsPage() {
 
   return (
     <div className="container py-8">
+      <div className="mb-4">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/doctor/dashboard" className="flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Retour au tableau de bord
+          </Link>
+        </Button>
+      </div>
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Patients</h1>
           <p className="text-muted-foreground">Gérez vos patients et leurs dossiers médicaux</p>
         </div>
-        <Button asChild>
-          <Link href="/doctor/patients/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Nouveau patient
-          </Link>
-        </Button>
+        
       </div>
 
       <Suspense

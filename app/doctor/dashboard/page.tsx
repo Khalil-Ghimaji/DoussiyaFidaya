@@ -1,15 +1,13 @@
 import { Suspense } from "react"
-import { Loader2 } from "lucide-react"
-import { auth } from "@/lib/auth"
+import { Loader2, Users } from "lucide-react"
 import { DashboardStats } from "./dashboard-stats"
 import { UpcomingAppointments } from "./upcoming-appointments"
 import { RecentConsultations } from "./recent-consultations"
 import { GET_DOCTOR_DASHBOARD } from "@/lib/graphql/queriesV2/doctor"
-import { executeGraphQLServer } from "@/lib/graphql-server"
 import { sendGraphQLMutation } from "@/lib/graphql-client"
 import { cookies } from "next/headers"
-
- 
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
 
 // Define dashboard data types based on the new GraphQL structure
 type DashboardData = {
@@ -48,14 +46,11 @@ type DashboardData = {
 
 async function getDashboardData() {
   try {
-    const storedSession = await cookies();
-    const doctorId = storedSession.get("associatedId")?.value;
-    const session = { user: { id: doctorId } } 
+    const storedSession = await cookies()
+    const doctorId = storedSession.get("associatedId")?.value
+    const session = { user: { id: doctorId } }
 
-    const { data } = await sendGraphQLMutation<DashboardData>(
-      GET_DOCTOR_DASHBOARD,
-       { doctorId: session.user.id }
-    )
+    const { data } = await sendGraphQLMutation<DashboardData>(GET_DOCTOR_DASHBOARD, { doctorId: session.user.id })
 
     return data
   } catch (error) {
@@ -76,7 +71,7 @@ export default async function DashboardPage() {
   const dashboardData = await getDashboardData()
 
   // Calculate unique patients count
-  const uniquePatientIds = new Set(dashboardData.patientData.map(p => p.patient_id))
+  const uniquePatientIds = new Set(dashboardData.patientData.map((p) => p.patient_id))
   const totalPatients = uniquePatientIds.size
 
   // Transform data for components
@@ -116,7 +111,15 @@ export default async function DashboardPage() {
 
   return (
     <div className="container py-8">
-      <h1 className="text-3xl font-bold tracking-tight mb-8">Tableau de bord</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <h1 className="text-3xl font-bold tracking-tight">Tableau de bord</h1>
+        <Button asChild variant="outline" size="sm" className="w-fit">
+          <Link href="/doctor/patients" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Voir tous les patients
+          </Link>
+        </Button>
+      </div>
 
       <Suspense
         fallback={
