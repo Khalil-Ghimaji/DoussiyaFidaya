@@ -5,12 +5,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UserPlus, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { fetchGraphQL } from "@/lib/graphql-client"
-// import { auth } from "@/lib/auth"  // Temporarily commented
-import { notFound } from "next/navigation"
 import { DoctorAppointmentsTable } from "@/components/doctor/appointments-table"
 import { AppointmentFilters } from "@/components/doctor/appointment-filters"
 import { gql } from "@apollo/client"
-import { format, parseISO, isSameDay } from "date-fns"
+import { parseISO, isSameDay } from "date-fns"
 import { cookies } from "next/headers"
 
 // Using dynamic rendering for appointments page to ensure fresh data

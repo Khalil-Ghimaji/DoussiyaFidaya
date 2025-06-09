@@ -259,20 +259,20 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
             connectToSSE()
           }, delay)
 
-          toast({
-            title: "Connexion interrompue",
-            description: `Tentative de reconnexion... (${retryCount + 1}/${maxRetries})`,
-            variant: "destructive",
-            duration: 3000,
-          })
+          // toast({
+          //   title: "Connexion interrompue",
+          //   description: `Tentative de reconnexion... (${retryCount + 1}/${maxRetries})`,
+          //   variant: "destructive",
+          //   duration: 3000,
+          // })
         } else {
           setConnectionStatus("disconnected")
-          toast({
-            title: "Connexion échouée",
-            description: "Impossible de se connecter aux notifications en temps réel. Veuillez rafraîchir la page.",
-            variant: "destructive",
-            duration: 10000,
-          })
+          // toast({
+          //   title: "Connexion échouée",
+          //   description: "Impossible de se connecter aux notifications en temps réel. Veuillez rafraîchir la page.",
+          //   variant: "destructive",
+          //   duration: 10000,
+          // })
         }
       }
 
@@ -310,11 +310,11 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       setUnreadCount((prev) => prev + 1)
       console.error("Mark as read failed:", error)
 
-      toast({
-        title: "Erreur",
-        description: "Impossible de marquer la notification comme lue",
-        variant: "destructive",
-      })
+      // toast({
+      //   title: "Erreur",
+      //   description: "Impossible de marquer la notification comme lue",
+      //   variant: "destructive",
+      // })
     }
   }, [toast])
 
@@ -352,11 +352,11 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       )
       setUnreadCount(notifications.filter((n) => !n.read).length)
 
-      toast({
-        title: "Erreur",
-        description: "Impossible de marquer les notifications comme lues",
-        variant: "destructive",
-      })
+      // toast({
+      //   title: "Erreur",
+      //   description: "Impossible de marquer les notifications comme lues",
+      //   variant: "destructive",
+      // })
     }
   }, [notifications, toast])
 
@@ -389,11 +389,11 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
         if (!toDelete.read) setUnreadCount((prev) => prev + 1)
       }
 
-      toast({
-        title: "Erreur",
-        description: "Impossible de supprimer la notification",
-        variant: "destructive",
-      })
+      // toast({
+      //   title: "Erreur",
+      //   description: "Impossible de supprimer la notification",
+      //   variant: "destructive",
+      // })
     }
   }, [notifications, toast])
 

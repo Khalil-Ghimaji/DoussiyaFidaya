@@ -120,7 +120,7 @@ export function AcceptAppointmentForm({ appointment }: AcceptAppointmentFormProp
         {
           data: {
             date: `${format(selectedDate, "yyyy-MM-dd")}T00:00:00.000Z`,
-            time: `1970-01-01T${appointment.time}.000Z`,
+            time: `${appointment.time}`,
             patients: {
               connect: {
                 id: appointment.patient.id
